@@ -10,8 +10,6 @@
   --xhs-line: #f1f1f1;
   --xhs-bg: #f7f7f7;
   --xhs-card: #ffffff;
-  --tabbar-h: 50px;
-  --safe-bottom: 0px;
 }
 
 * {
@@ -93,45 +91,6 @@ button {
 
 .page-body::-webkit-scrollbar {
   display: none;
-}
-
-/* ---------- 底部导航容器 ---------- */
-.tabbar-wrap {
-  position: relative;
-  flex-shrink: 0;
-  background: #fff;
-  border-top: 1px solid var(--xhs-line);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* 覆盖 NutUI Tabbar 默认高度，贴合小红书观感 */
-.tabbar-wrap .nut-tabbar {
-  height: var(--tabbar-h);
-  padding: 0;
-  border: none;
-  box-shadow: none;
-}
-
-.tabbar-wrap .nut-tabbar-item {
-  font-size: 10px;
-  line-height: 1;
-}
-
-.tabbar-wrap .nut-tabbar-item__icon {
-  margin-bottom: 2px;
-}
-
-/* 中间发布按钮 */
-.tabbar-plus {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--xhs-red);
-  color: #fff;
-  box-shadow: 0 3px 8px rgba(255, 36, 66, 0.35);
 }
 
 /* ---------- 通用小工具 ---------- */

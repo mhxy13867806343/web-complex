@@ -2,92 +2,19 @@
  * 业务模块样式
  * ============================================================ */
 
-/* ---------------- 数据来源提示 ---------------- */
-.data-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  font-size: 11px;
-  color: #8a8a8a;
-  background: #fafafa;
-  border-bottom: 1px solid var(--xhs-line);
-}
-
-.data-banner .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #34c759;
-  flex-shrink: 0;
-}
-
-.demo-banner {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 8px 12px;
-  font-size: 11px;
-  line-height: 1.6;
-  color: #a06a00;
-  background: #fff8e6;
-  border-bottom: 1px solid #ffe9b8;
-}
-
-.demo-banner b {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  font-size: 10px;
-  color: #fff;
-  background: #f0a30a;
-  border-radius: 4px;
-}
-
-/* ---------------- 需登录占位 ---------------- */
-.login-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 54px 28px 64px;
-  text-align: center;
-}
-
-.login-hint b {
-  font-size: 14px;
-  color: #666;
-}
-
-.login-hint p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: #9b9b9b;
-}
-
-.login-hint-tip {
-  margin-top: 6px;
-  font-size: 11.5px;
-  line-height: 1.8;
-  color: #b3b3b3;
-}
-
-.login-hint-tip code {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
-  color: #13386c;
-  background: #eef3fb;
-  border-radius: 5px;
-  word-break: break-all;
-}
-
-/* ---------------- 顶部栏 ---------------- */
-.xhs-header {
+/* ---------------- 顶栏整体吸顶 ---------------- */
+/* header + 下拉刷新提示区 + 频道 chips 包在这一层，整体 sticky 到顶部。
+   滚动容器是 .page-body（overflow-y:auto），.sticky-top 是它内容区的直接子元素，
+   所以滚动时这一整块会吸在 .page-body 顶部，滚多远都能直接切频道 / 下拉刷新。
+   注意：背景必须是不透明的，否则下方内容会透上来。 */
+.sticky-top {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 30;
+  background: #fff;
+}
+
+.xhs-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -129,56 +56,137 @@
   color: #333;
 }
 
-/* ---------------- 主 Tab（关注/发现/附近） ---------------- */
-.main-tabs {
+/* 刷新按钮：点一下现抓一次小红书 */
+.xhs-refresh {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+}
+
+.xhs-refresh:active {
+  color: var(--xhs-red);
+}
+
+.xhs-refresh.spinning svg {
+  animation: xhs-spin 0.9s linear infinite;
+}
+
+@keyframes xhs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* ---------------- Toast（自实现，替代 NutUI Toast） ---------------- */
+.wb-toast-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 45%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.wb-toast {
+  max-width: 74%;
+  padding: 10px 16px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 10px;
+  animation: wb-toast-in 0.18s ease;
+}
+
+@keyframes wb-toast-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------------- 下拉刷新提示区 ---------------- */
+.ptr {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  background: var(--xhs-bg);
+  color: #9b9b9b;
+  font-size: 12px;
+  /* 松手回弹时带过渡；跟手拖动时由 .pulling 关掉，避免"粘不住手" */
+  transition: height 0.22s ease;
+}
+
+.ptr.pulling {
+  transition: none;
+}
+
+.ptr span {
+  padding-bottom: 8px;
+}
+
+/* ---------------- 频道 chips（单行横向滚动） ---------------- */
+.chips-wrap {
+  position: relative;
   background: #fff;
 }
 
-.main-tabs .nut-tabs__titles {
-  justify-content: center;
-  padding: 0 8px;
-  background: #fff;
-  box-shadow: none;
-}
-
-.main-tabs .nut-tabs__list {
-  justify-content: center;
-}
-
-.main-tabs .nut-tabs__titles-item {
-  font-size: 16px;
-  color: #b3b3b3;
-}
-
-.main-tabs .nut-tabs__titles-item.active {
-  font-size: 17px;
-  font-weight: 700;
-  color: #333;
-}
-
-.main-tabs .nut-tabs__titles-item__line {
-  width: 18px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--xhs-red);
-}
-
-/* ---------------- 频道 chips ---------------- */
 .chips {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 10px 12px 12px;
   overflow-x: auto;
-  background: #fff;
   white-space: nowrap;
+  background: #fff;
+  /* 注意：这里不能设 scroll-behavior: smooth。
+     滚轮/拖拽需要即时赋值 scrollLeft，平滑动画会让跟手失效；
+     箭头翻页是用 scrollBy({behavior:'smooth'}) 单独指定的，不受影响。 */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: grab;
 }
 
 .chips::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 
+/* 按住拖动时：取消平滑滚动，避免跟手时"飘" */
+.chips.dragging {
+  cursor: grabbing;
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+
+.chips.dragging .chip {
+  pointer-events: none;
+}
+
 .chip {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   padding: 6px 13px;
   font-size: 13px;
   color: #666;
@@ -186,7 +194,7 @@
   border-radius: 16px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .chip.active {
@@ -195,39 +203,77 @@
   background: var(--xhs-red);
 }
 
-/* ---------------- 专题横滑 ---------------- */
-.topics {
-  display: flex;
-  gap: 10px;
-  padding: 0 12px 12px;
-  overflow-x: auto;
-  background: #fff;
+/* 两侧渐隐，提示"这边还有内容" */
+.chips-wrap::before,
+.chips-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
 }
 
-.topic {
-  flex-shrink: 0;
+.chips-wrap::before {
+  left: 0;
+  background: linear-gradient(to right, #fff 25%, rgba(255, 255, 255, 0));
+}
+
+.chips-wrap::after {
+  right: 0;
+  background: linear-gradient(to left, #fff 25%, rgba(255, 255, 255, 0));
+}
+
+.chips-wrap.can-left::before {
+  opacity: 1;
+}
+
+.chips-wrap.can-right::after {
+  opacity: 1;
+}
+
+/* 左右翻页箭头 */
+.chips-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: linear-gradient(135deg, #fff5f7, #fff0f3);
-  border: 1px solid #ffe4ea;
-  border-radius: 12px;
-}
-
-.topic-emoji {
-  font-size: 20px;
-}
-
-.topic-name {
-  font-size: 13px;
-  font-weight: 600;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
   color: #333;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.topic-hot {
-  font-size: 11px;
-  color: #b3b3b3;
+.chips-wrap:hover .chips-arrow {
+  opacity: 1;
+}
+
+.chips-wrap:hover .chips-arrow.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chips-arrow.left {
+  left: 5px;
+}
+
+.chips-arrow.right {
+  right: 5px;
 }
 
 /* ---------------- 瀑布流 ---------------- */
@@ -624,457 +670,6 @@
 
 .detail-action.on {
   color: var(--xhs-red);
-}
-
-/* ---------------- 购物页 ---------------- */
-.shop-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(180deg, #ff4757, #ff2442);
-  padding: 10px 12px 12px;
-}
-
-.shop-addr {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #fff;
-  cursor: pointer;
-  margin-bottom: 8px;
-}
-
-.shop-addr-text {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 220px;
-}
-
-.shop-search .nut-searchbar__search-input {
-  height: 32px;
-  border-radius: 16px;
-}
-
-.shop-block {
-  margin: 10px;
-  padding: 12px;
-  background: #fff;
-  border-radius: 12px;
-}
-
-.shop-block-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.shop-block-title h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.shop-block-title .more {
-  font-size: 12px;
-  color: #9b9b9b;
-}
-
-.seckill-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.seckill-cd {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #666;
-}
-
-.cd-box {
-  min-width: 20px;
-  padding: 2px 4px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  text-align: center;
-  background: #222;
-  border-radius: 4px;
-}
-
-/* 秒杀倒计时里的数字块 */
-.seckill-cd .cd-box-text,
-.seckill-cd .nut-countdown {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--xhs-red);
-  font-variant-numeric: tabular-nums;
-}
-
-.seckill-list {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-top: 2px;
-}
-
-.seckill-item {
-  flex-shrink: 0;
-  width: 108px;
-}
-
-.sk-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 108px;
-  font-size: 40px;
-  border-radius: 10px;
-}
-
-.sk-name {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #333;
-}
-
-.sk-price {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  margin-top: 3px;
-}
-
-.sk-origin {
-  font-size: 11px;
-  color: #bbb;
-  text-decoration: line-through;
-}
-
-/* 优惠券 */
-.coupons {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-}
-
-.coupon {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 200px;
-  padding: 10px 12px;
-  color: #fff;
-  background: linear-gradient(120deg, #ff5f6d, #ff2442);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.coupon::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 46px;
-  width: 0;
-  border-left: 1px dashed rgba(255, 255, 255, 0.6);
-}
-
-.coupon.got {
-  background: linear-gradient(120deg, #d8d8d8, #bfbfbf);
-}
-
-.coupon-amount {
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.coupon-amount small {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.coupon-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.coupon-name {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.coupon-exp {
-  margin-top: 2px;
-  font-size: 11px;
-  opacity: 0.85;
-}
-
-.coupon-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--xhs-red);
-  background: #fff;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.coupon.got .coupon-btn {
-  color: #999;
-}
-
-/* 分类 + 商品 */
-.shop-main {
-  display: flex;
-  margin: 10px;
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.shop-side {
-  flex-shrink: 0;
-  width: 88px;
-  background: #f7f7f7;
-}
-
-.shop-side .nut-sidenavbar {
-  background: #f7f7f7;
-}
-
-.shop-goods {
-  flex: 1;
-  min-width: 0;
-  padding: 10px;
-}
-
-.goods-item {
-  display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--xhs-line);
-  cursor: pointer;
-}
-
-.goods-item:last-child {
-  border-bottom: none;
-}
-
-.goods-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 92px;
-  height: 92px;
-  font-size: 38px;
-  border-radius: 10px;
-}
-
-.goods-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.goods-name {
-  font-size: 13px;
-  line-height: 1.4;
-  color: #333;
-}
-
-.goods-tags {
-  display: flex;
-  gap: 4px;
-  margin: 5px 0;
-}
-
-.goods-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-}
-
-.goods-sold {
-  font-size: 11px;
-  color: #9b9b9b;
-}
-
-.btn-buy {
-  padding: 5px 14px;
-  font-size: 12px;
-  color: #fff;
-  background: var(--xhs-red);
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-}
-
-/* ---------------- 消息页 / 我的页 ---------------- */
-.simple-header {
-  padding: 16px;
-  background: #fff;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.msg-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: #fff;
-  border-bottom: 1px solid var(--xhs-line);
-}
-
-.msg-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  font-size: 22px;
-  border-radius: 50%;
-}
-
-.msg-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.msg-name {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.msg-preview {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #9b9b9b;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.msg-right {
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.msg-time {
-  font-size: 11px;
-  color: #bbb;
-}
-
-.badge-dot {
-  display: inline-block;
-  min-width: 17px;
-  height: 17px;
-  margin-top: 4px;
-  padding: 0 5px;
-  font-size: 11px;
-  line-height: 17px;
-  color: #fff;
-  text-align: center;
-  background: var(--xhs-red);
-  border-radius: 9px;
-}
-
-/* 我的页 */
-.me-header {
-  padding: 24px 16px 18px;
-  background: linear-gradient(135deg, #fff1f3, #fff);
-}
-
-.me-user {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.me-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 62px;
-  height: 62px;
-  font-size: 30px;
-  border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(255, 36, 66, 0.2);
-}
-
-.me-avatar-guest {
-  font-size: 26px;
-  color: #b3b3b3;
-  background: #f0f0f0;
-  box-shadow: none;
-}
-
-.btn-login {
-  flex-shrink: 0;
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--xhs-red);
-  border: none;
-  border-radius: 16px;
-  cursor: pointer;
-}
-
-.me-name {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.me-id {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #9b9b9b;
-}
-
-.me-stats {
-  display: flex;
-  gap: 26px;
-  margin-top: 18px;
-}
-
-.me-stat {
-  text-align: center;
-}
-
-.me-stat b {
-  display: block;
-  font-size: 16px;
-}
-
-.me-stat span {
-  font-size: 11px;
-  color: #9b9b9b;
-}
-
-.me-grid {
-  margin: 10px;
-  padding: 12px 0;
-  background: #fff;
-  border-radius: 12px;
-}
-
-.me-cell-group {
-  margin-top: 10px;
 }
 
 /* ---------------- 空状态 ---------------- */

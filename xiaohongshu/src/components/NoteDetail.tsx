@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Popup, Toast } from '@nutui/nutui-react'
+import { Popup } from '@nutui/nutui-react'
 import { ArrowLeft, Heart, HeartFill, Share, Star, StarFill } from '@nutui/icons-react'
 import type { Note } from '../data'
+import { Toast } from './Toast'
 
 interface Props {
   note: Note | null

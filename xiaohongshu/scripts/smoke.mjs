@@ -18,6 +18,24 @@ for (const key of ['HTMLElement', 'Element', 'Node', 'Event', 'MouseEvent', 'Cus
 }
 Object.defineProperty(g, 'navigator', { value: dom.window.navigator, configurable: true })
 g.MutationObserver = dom.window.MutationObserver
+// jsdom 没有 ResizeObserver（也不做布局），给个空实现让组件能装上
+if (!g.ResizeObserver) {
+  g.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
+// jsdom 没实现滚动方法（scrollTo / scrollBy / scrollIntoView），
+// 组件里切换频道 / 自动吸顶会调用到，不 stub 会直接抛 TypeError 让 act 环境崩掉。
+for (const fn of ['scrollTo', 'scrollBy', 'scrollIntoView']) {
+  if (!dom.window.Element.prototype[fn]) {
+    dom.window.Element.prototype[fn] = function () {
+      return
+    }
+  }
+}
 
 const { run } = await import('../.smoke/smoke-entry.js')
 

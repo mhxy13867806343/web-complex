@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "start": "node scripts/server.mjs",
     "login": "node scripts/login.mjs",
-    "fetch:notes": "node scripts/fetch-notes.mjs",
     "smoke": "vite build --config scripts/vite.smoke.config.ts && node scripts/smoke.mjs"
   },
   "dependencies": {
