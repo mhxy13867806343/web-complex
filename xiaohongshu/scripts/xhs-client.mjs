@@ -1,5 +1,5 @@
 /**
- * 小红书网页版抓取客户端（被 fetch-notes.mjs / login.mjs 共用）
+ * 小红书网页版抓取客户端（被 /api/xhs 接口层与 login.mjs 共用）
  *
  * 两个关键事实：
  * 1) 必须用 curl 发请求。Node 内置 fetch（undici）的 TLS 指纹会被 WAF 识别并 302 到 /login，
