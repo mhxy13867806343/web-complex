@@ -1,6 +1,6 @@
 {
  "source": "https://www.xiaohongshu.com/explore",
- "fetchedAt": "2026-09-21T12:49:45.984Z",
+ "fetchedAt": "2026-09-21T13:04:07.279Z",
  "count": 333,
  "note": "本文件由 scripts/fetch-notes.mjs 抓取生成。封面与头像为小红书 CDN 直链，带时效，如失效请重新执行 npm run fetch:notes。",
  "channels": [
@@ -16,6 +16,19 @@
   "健身",
   "视频"
  ],
+ "channelIds": {
+  "穿搭": "homefeed.fashion_v3",
+  "美食": "homefeed.food_v3",
+  "彩妆": "homefeed.cosmetics_v3",
+  "影视": "homefeed.movie_and_tv_v3",
+  "职场": "homefeed.career_v3",
+  "情感": "homefeed.love_v3",
+  "家居": "homefeed.household_product_v3",
+  "游戏": "homefeed.gaming_v3",
+  "旅行": "homefeed.travel_v3",
+  "健身": "homefeed.fitness_v3",
+  "视频": "homefeed.video"
+ },
  "notes": [
   {
    "id": "6a8cfc06000000002b000cd9",

@@ -1,14 +1,28 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Empty, InfiniteLoading, SearchBar, Tabs, Toast } from '@nutui/nutui-react'
 import { Photograph, Tips } from '@nutui/icons-react'
-import { CHANNELS, FETCHED_AT, NOTES, PAGE_SIZE, type Note } from '../data'
+import {
+  CHANNEL_FEEDS,
+  CHANNELS_FETCHED_AT,
+  FETCHED_AT,
+  NOTES,
+  PAGE_SIZE,
+  getChannelFeed,
+  type Note,
+} from '../data'
 import NoteDetail from './NoteDetail'
 import Waterfall from './Waterfall'
 
-/** 未登录时不可用的页签 */
+/** 未登录时不可用的页签（小红书需要账号登录态 + 定位权限） */
 const LOGIN_REQUIRED_TABS = new Set(['follow', 'nearby'])
 
-function formatTime(iso: string): string {
+const RECOMMEND = '推荐'
+
+/** 频道 chips：推荐 + 已抓到真实数据的频道 */
+const CHIPS = [RECOMMEND, ...CHANNEL_FEEDS.map((c) => c.name)]
+
+function formatTime(iso: string | null): string {
+  if (!iso) return '未知时间'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '未知时间'
   const p = (n: number) => String(n).padStart(2, '0')
@@ -17,21 +31,20 @@ function formatTime(iso: string): string {
 
 export default function Explore() {
   const [tab, setTab] = useState<string>('discover')
-  const [channel, setChannel] = useState<string>('推荐')
+  const [channel, setChannel] = useState<string>(RECOMMEND)
   const [liked, setLiked] = useState<Record<string, boolean>>({})
   const [collected, setCollected] = useState<Record<string, boolean>>({})
   const [openNote, setOpenNote] = useState<Note | null>(null)
   const [visible, setVisible] = useState(PAGE_SIZE)
 
-  /** 频道切换需要登录态，匿名抓取只能拿到「推荐」流 */
-  const channelLocked = channel !== '推荐'
+  const lockedTab = LOGIN_REQUIRED_TABS.has(tab)
+  const feed = channel === RECOMMEND ? null : getChannelFeed(channel)
 
-  const list = useMemo(() => {
-    if (LOGIN_REQUIRED_TABS.has(tab) || channelLocked) return []
-    return NOTES.slice(0, visible)
-  }, [tab, channelLocked, visible])
+  /** 当前流的数据：推荐流 or 频道流；频道没数据时为空 */
+  const activeNotes: Note[] = feed ? feed.notes : channel === RECOMMEND ? NOTES : []
 
-  const hasMore = !LOGIN_REQUIRED_TABS.has(tab) && !channelLocked && visible < NOTES.length
+  const list = lockedTab ? [] : activeNotes.slice(0, visible)
+  const hasMore = !lockedTab && visible < activeNotes.length
 
   const toggleLike = (note: Note) => {
     setLiked((prev) => ({ ...prev, [note.id]: !prev[note.id] }))
@@ -51,31 +64,30 @@ export default function Explore() {
       }, 500)
     })
 
-  const loginHint = (
+  const lockedHint = (
     <div className="login-hint">
       <Tips width={26} height={26} color="#c8c8c8" />
-      <b>{LOGIN_REQUIRED_TABS.has(tab) ? '该页签需要登录' : `「${channel}」频道需要登录`}</b>
-      <p>
-        {LOGIN_REQUIRED_TABS.has(tab)
-          ? '小红书「关注」与「附近」依赖账号登录态与定位权限，匿名访问拿不到数据，这里如实留空。'
-          : '小红书频道页（?channel_id=...）会对匿名请求 302 到登录页，所以频道内容抓不到。'}
-      </p>
-      <span className="login-hint-tip">
-        若要看真实频道内容，可带登录 Cookie 重新抓取：
-        <code>XHS_COOKIE=&quot;...&quot; npm run fetch:notes</code>
-      </span>
+      <b>「{tab === 'follow' ? '关注' : '附近'}」需要登录</b>
+      <p>小红书「关注」与「附近」依赖账号登录态与定位权限，匿名访问拿不到数据，这里如实留空。</p>
     </div>
   )
+
+  const banner =
+    channel === RECOMMEND
+      ? `共 ${NOTES.length} 条真实笔记 · 抓取自 xiaohongshu.com/explore · ${formatTime(FETCHED_AT)}`
+      : `「${channel}」共 ${activeNotes.length} 条真实笔记 · 频道 id ${feed?.id ?? '—'} · ${formatTime(
+          CHANNELS_FETCHED_AT
+        )}`
 
   const content = (
     <>
       <div className="data-banner">
         <span className="dot" />
-        共 {NOTES.length} 条真实笔记 · 抓取自 xiaohongshu.com/explore · {formatTime(FETCHED_AT)}
+        {banner}
       </div>
 
       <div className="chips">
-        {CHANNELS.map((c) => (
+        {CHIPS.map((c) => (
           <span
             key={c}
             className={`chip${channel === c ? ' active' : ''}`}
@@ -89,11 +101,11 @@ export default function Explore() {
         ))}
       </div>
 
-      {LOGIN_REQUIRED_TABS.has(tab) || channelLocked ? (
-        loginHint
+      {lockedTab ? (
+        lockedHint
       ) : list.length === 0 ? (
         <div className="empty-box">
-          <Empty description="没有内容" />
+          <Empty description="该频道暂无数据，执行 npm run fetch:notes 抓取" />
         </div>
       ) : (
         <Waterfall notes={list} liked={liked} onLike={toggleLike} onOpen={setOpenNote} />

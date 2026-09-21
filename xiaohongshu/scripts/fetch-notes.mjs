@@ -1,167 +1,251 @@
 #!/usr/bin/env node
 /**
- * 抓取小红书探索页的真实笔记数据
+ * 抓取小红书真实笔记数据（推荐流 + 各频道流）
  *
- * 原理：www.xiaohongshu.com/explore 的服务端渲染 HTML 里带有
- * `window.__INITIAL_STATE__`，其中的 feed.feeds 就是首屏推荐流（含标题、
- * 封面直链、作者头像、点赞数、xsec_token）。每次请求返回的内容都不同，
- * 因此多抓几轮可以累积出一批真实数据。
+ * 原理：www.xiaohongshu.com/explore 的服务端渲染 HTML 里带有 `window.__INITIAL_STATE__`，
+ * 其中 feed.feeds 就是当前流的笔记（含标题、封面直链、作者头像、点赞数、xsec_token）。
+ * 每次请求返回的内容不同，多抓几轮可以累积出一批数据。
  *
  * 用法：
- *   node scripts/fetch-notes.mjs [轮数]      # 默认 8 轮
+ *   npm run fetch:notes                 # 推荐流 8 轮 + 各频道 3 轮
+ *   npm run fetch:notes -- 12           # 推荐流 12 轮
+ *   npm run fetch:notes -- --rounds 12 --channel-rounds 5
+ *   npm run fetch:notes -- --no-recommend        # 只刷频道（推荐流保留原数据）
+ *   npm run fetch:notes -- --no-channels         # 只刷推荐流
  *
- * 说明：频道页（?channel_id=...）与笔记详情页需要登录，匿名请求会被 302 到
- * /login，所以本脚本只抓默认的推荐流。
+ * 登录态（抓频道必须要）：
+ *   小红书现在对匿名访客全站 302 到登录页，频道数据必须带 Cookie。
+ *   先执行 `npm run login` 把 Cookie 存到 .xhs-cookie，或临时用：
+ *     XHS_COOKIE="a1=...; web_session=..." npm run fetch:notes
+ *
+ * 产物：
+ *   src/data/notes.json     推荐流（前端「发现」页）
+ *   src/data/channels.json  各频道流（前端频道 chips）
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { execFile } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import {
+  CHANNEL_FALLBACK,
+  EXPLORE_URL,
+  ROOT,
+  applyChannelFix,
+  channelUrl,
+  extractFeeds,
+  normalizeFeedItem,
+  probe,
+  resolveCookie,
+  sleep,
+} from './xhs-client.mjs'
 
-const execFileAsync = promisify(execFile)
+const OUT_NOTES = path.join(ROOT, 'src/data/notes.json')
+const OUT_CHANNELS = path.join(ROOT, 'src/data/channels.json')
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const ROOT = path.resolve(__dirname, '..')
-const OUT = path.join(ROOT, 'src/data/notes.json')
-
-const ROUNDS = Math.max(1, Math.min(30, Number(process.argv[2]) || 8))
-const UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-
-/**
- * 用 curl 发请求，而不是 Node 内置 fetch。
- * 原因：小红书的 WAF 会对 Node/undici 的 TLS 指纹直接返回 302 到 /login，
- * 而 curl 的指纹可以正常拿到 SSR 页面（已实测，与请求头无关）。
- */
-async function httpGet(url) {
-  const { stdout } = await execFileAsync(
-    'curl',
-    [
-      '-s',
-      '--max-time',
-      '25',
-      '-H',
-      `User-Agent: ${UA}`,
-      '-H',
-      'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      '-H',
-      'Accept-Language: zh-CN,zh;q=0.9',
-      url,
-    ],
-    { maxBuffer: 32 * 1024 * 1024 }
-  )
-  return stdout
+/** 命令行参数解析 */
+function parseArgs(argv) {
+  const opts = {
+    rounds: null,
+    channelRounds: 3,
+    recommend: true,
+    channels: true,
+    cookie: '',
+    only: [],
+    maxChannel: 150,
+  }
+  const rest = []
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--rounds') opts.rounds = Number(argv[++i])
+    else if (a === '--channel-rounds') opts.channelRounds = Number(argv[++i])
+    else if (a === '--no-recommend') opts.recommend = false
+    else if (a === '--no-channels') opts.channels = false
+    else if (a === '--cookie') opts.cookie = argv[++i] || ''
+    else if (a === '--max-channel') opts.maxChannel = Number(argv[++i]) || 150
+    else if (a === '--only') {
+      opts.only = String(argv[++i] || '')
+        .split(/[,，\s]+/)
+        .filter(Boolean)
+    } else if (!a.startsWith('--')) rest.push(a)
+  }
+  if (opts.rounds === null) opts.rounds = Number(rest[0]) || 8
+  opts.rounds = Math.max(1, Math.min(50, opts.rounds))
+  opts.channelRounds = Math.max(1, Math.min(20, opts.channelRounds))
+  return opts
 }
 
-/** 从 SSR HTML 中取出 __INITIAL_STATE__ 并解析 */
-function parseInitialState(html) {
-  const key = 'window.__INITIAL_STATE__='
-  const start = html.indexOf(key)
-  if (start < 0) return null
-  const from = start + key.length
-  const end = html.indexOf('</script>', from)
-  if (end < 0) return null
-  let json = html.slice(from, end).trim()
-  if (json.endsWith(';')) json = json.slice(0, -1)
-  // 该对象是 JS 字面量，可能含 undefined，先替换成 null 再解析
-  json = json.replace(/:\s*undefined/g, ':null').replace(/,\s*undefined/g, ',null')
+const opts = parseArgs(process.argv.slice(2))
+
+/** 读已有产物，避免抓失败时把好数据覆盖掉 */
+async function readJson(file) {
   try {
-    return JSON.parse(json)
+    return JSON.parse(await fs.readFile(file, 'utf8'))
   } catch {
     return null
   }
 }
 
-/** 优先取默认规格的封面，统一升级为 https */
-function pickCover(cover) {
-  if (!cover) return ''
-  const list = cover.infoList || []
-  const dft = list.find((i) => i.imageScene === 'WB_DFT') || list[0]
-  const url = (dft && dft.url) || cover.urlDefault || cover.urlPre || cover.url || ''
-  return url.replace(/^http:/, 'https:')
+async function writeJson(file, data) {
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  await fs.writeFile(file, JSON.stringify(data, null, 1), 'utf8')
 }
 
-async function fetchOnce(round) {
-  const html = await httpGet('https://www.xiaohongshu.com/explore')
-  const state = parseInitialState(html)
-  if (!state) {
-    console.warn(`  第 ${round} 轮：未取到 __INITIAL_STATE__（${html.length} 字节）`)
-    return { items: [], channels: [] }
+/** 反复抓同一个 URL，累积去重 */
+async function collect(url, rounds, cookie, label, map) {
+  for (let i = 1; i <= rounds; i++) {
+    try {
+      const { status, state, location } = await probe(url, cookie)
+      if (!state) {
+        const why = status === 302 ? `被 302 到 ${location || '/login'}` : `HTTP ${status}`
+        console.warn(`  ${label} 第 ${i} 轮：拿不到数据（${why}）`)
+        if (status === 302) return { blocked: true, added: 0 }
+        continue
+      }
+      const feeds = extractFeeds(state)
+      let added = 0
+      for (const it of feeds) {
+        const n = normalizeFeedItem(it)
+        if (n && !map.has(n.id)) {
+          map.set(n.id, n)
+          added++
+        }
+      }
+      console.log(`  ${label} 第 ${i} 轮：返回 ${feeds.length} 条，新增 ${added} 条`)
+    } catch (e) {
+      console.warn(`  ${label} 第 ${i} 轮失败：${e.message}`)
+    }
+    if (i < rounds) await sleep(1200 + Math.random() * 900)
   }
-  const feeds = (state.feed && state.feed.feeds) || []
-  const categories = (state.feed && state.feed.channels && state.feed.channels.categories) || []
-  console.log(`  第 ${round} 轮：${feeds.length} 条`)
-  return { items: feeds, channels: categories }
-}
-
-function normalize(item) {
-  const card = item.noteCard
-  if (!card) return null
-  const cover = pickCover(card.cover)
-  const title = (card.displayTitle || '').trim()
-  if (!cover || !title) return null
-  const user = card.user || {}
-  const w = card.cover?.width || 3
-  const h = card.cover?.height || 4
-  return {
-    id: item.id,
-    title,
-    cover,
-    // 用真实宽高比驱动瀑布流错落排布
-    coverWidth: w,
-    coverHeight: h,
-    type: card.type === 'video' ? 'video' : 'normal',
-    likes: (card.interactInfo && card.interactInfo.likedCount) || '0',
-    author: {
-      name: user.nickname || user.nickName || '小红书用户',
-      avatar: user.avatar || '',
-    },
-    // 带上 xsec_token 才是可访问的原站链接
-    noteUrl: `https://www.xiaohongshu.com/explore/${item.id}?xsec_token=${item.xsecToken || ''}&xsec_source=pc_feed`,
-  }
+  return { blocked: false, added: map.size }
 }
 
 async function main() {
-  console.log(`开始抓取小红书探索页，共 ${ROUNDS} 轮……`)
-  const map = new Map()
-  let channels = []
-  for (let i = 1; i <= ROUNDS; i++) {
-    try {
-      const { items, channels: chs } = await fetchOnce(i)
-      if (chs.length && !channels.length) channels = chs.map((c) => c.name)
-      for (const it of items) {
-        const n = normalize(it)
-        if (n && !map.has(n.id)) map.set(n.id, n)
-      }
-    } catch (e) {
-      console.warn(`  第 ${i} 轮失败：${e.message}`)
+  const { cookie, from } = await resolveCookie(opts.cookie)
+  console.log(
+    `登录 Cookie 来源：${from}${cookie ? '' : '（匿名抓取；小红书偶尔会临时要求登录，此时配置 Cookie 即可）'}`
+  )
+
+  // ---- 1. 先探测探索页，同时拿到真实频道 id ----
+  console.log('\n探测探索页……')
+  const home = await probe(EXPLORE_URL, cookie)
+  if (home.ok) {
+    console.log(`  HTTP ${home.status}，拿到 ${extractFeeds(home.state).length} 条推荐流、${home.categories.length} 个频道`)
+  } else {
+    console.warn(
+      `  HTTP ${home.status}${home.location ? ` -> ${home.location}` : ''}，` +
+        '小红书当前要求登录。推荐流如有旧数据将保留，频道抓取会被跳过。'
+    )
+  }
+
+  const cookiesUsable = home.ok
+  const channelList = applyChannelFix(
+    home.categories.length > 0
+      ? home.categories.filter((c) => c.id && c.name !== '推荐')
+      : CHANNEL_FALLBACK
+  )
+  const channelSource =
+    (home.categories.length > 0 ? '探索页 SSR 实时读出' : '内置已知 id 兜底') +
+    (channelList.some((c) => c.originalId) ? '，其中部分 id 已按实测修正' : '')
+  for (const c of channelList) {
+    if (c.originalId) console.log(`  ⚠「${c.name}」频道 id 修正：${c.originalId} -> ${c.id}`)
+  }
+  const toFetch = opts.only.length ? channelList.filter((c) => opts.only.includes(c.name)) : channelList
+
+  // ---- 2. 推荐流 ----
+  let notes = []
+  const prevNotes = await readJson(OUT_NOTES)
+  if (opts.recommend) {
+    console.log(`\n抓取推荐流（${opts.rounds} 轮）……`)
+    const map = new Map()
+    if (!cookiesUsable && prevNotes?.notes?.length) {
+      // 抓不到就先把旧数据放进去，保证产物不会变空
+      for (const n of prevNotes.notes) map.set(n.id, n)
+      console.log(`  已载入本地旧数据 ${prevNotes.notes.length} 条作为兜底`)
     }
-    if (i < ROUNDS) await sleep(1200 + Math.random() * 800)
+    const { blocked } = await collect(EXPLORE_URL, opts.rounds, cookie, '推荐', map)
+    notes = [...map.values()]
+    if (blocked && !notes.length) {
+      console.error('\n推荐流没抓到任何数据。请先执行 npm run login 配置登录 Cookie。')
+    }
+  } else {
+    notes = prevNotes?.notes || []
+    console.log(`\n跳过推荐流，沿用本地 ${notes.length} 条。`)
   }
 
-  const notes = [...map.values()]
-  if (!notes.length) {
-    console.error('没有抓到任何数据，保持原有 notes.json 不变。')
-    process.exit(1)
+  if (notes.length) {
+    const prevChannels = prevNotes?.channels || []
+    const names = channelList.map((c) => c.name)
+    await writeJson(OUT_NOTES, {
+      source: EXPLORE_URL,
+      // 只在真的重抓了推荐流时才更新时间戳，避免沿用旧数据却显示新时间
+      fetchedAt: opts.recommend ? new Date().toISOString() : prevNotes?.fetchedAt || null,
+      count: notes.length,
+      note: '本文件由 scripts/fetch-notes.mjs 抓取生成。封面与头像为小红书 CDN 直链，带时效，如失效请重新执行 npm run fetch:notes。',
+      channels: names.length ? names : prevChannels,
+      channelIds: Object.fromEntries(channelList.map((c) => [c.name, c.id])),
+      notes,
+    })
+    console.log(`\n推荐流：${notes.length} 条 -> src/data/notes.json`)
+  } else {
+    console.warn('\n推荐流无数据，notes.json 保持不变。')
   }
 
-  const payload = {
-    source: 'https://www.xiaohongshu.com/explore',
+  // ---- 3. 各频道流 ----
+  const prevChannels = await readJson(OUT_CHANNELS)
+  const prevByName = new Map((prevChannels?.channels || []).map((c) => [c.name, c]))
+
+  if (!opts.channels) {
+    console.log('\n跳过频道流（--no-channels）。')
+  } else if (!cookiesUsable) {
+    console.log('\n跳过频道流：没有可用的登录 Cookie。')
+    console.log('  获取方式见 README「频道数据需要登录」一节，或直接执行：npm run login')
+  } else {
+    console.log(`\n抓取 ${toFetch.length} 个频道（每个 ${opts.channelRounds} 轮，频道 id 来自${channelSource}）……`)
+    for (const ch of toFetch) {
+      const map = new Map()
+      // 抓之前先放旧数据兜底
+      for (const n of prevByName.get(ch.name)?.notes || []) map.set(n.id, n)
+      const before = map.size
+      console.log(`[${ch.name}] ${ch.id}`)
+      const { blocked } = await collect(channelUrl(ch.id), opts.channelRounds, cookie, ch.name, map)
+      // 滚动窗口：超过上限就丢掉最早抓进来的，避免多次运行后文件无限膨胀
+      if (map.size > opts.maxChannel) {
+        const overflow = [...map.keys()].slice(0, map.size - opts.maxChannel)
+        for (const k of overflow) map.delete(k)
+      }
+      prevByName.set(ch.name, {
+        name: ch.name,
+        id: ch.id,
+        count: map.size,
+        fetchedAt: new Date().toISOString(),
+        stale: blocked || map.size === before,
+        notes: [...map.values()],
+      })
+      if (ch !== toFetch[toFetch.length - 1]) await sleep(1500 + Math.random() * 1000)
+    }
+  }
+
+  const outChannels = channelList.map(
+    (ch) =>
+      prevByName.get(ch.name) || { name: ch.name, id: ch.id, count: 0, fetchedAt: null, stale: true, notes: [] }
+  )
+  await writeJson(OUT_CHANNELS, {
+    source: `${EXPLORE_URL}?channel_id=...&channel_type=web_explore_feed`,
     fetchedAt: new Date().toISOString(),
-    count: notes.length,
-    note: '本文件由 scripts/fetch-notes.mjs 抓取生成。封面与头像为小红书 CDN 直链，带时效，如失效请重新执行 npm run fetch:notes。',
-    channels: channels.length ? channels : ['穿搭', '美食', '彩妆', '影视', '职场', '情感', '家居', '游戏', '旅行', '健身', '视频'],
-    notes,
-  }
+    withCookie: cookiesUsable,
+    note: '本文件由 scripts/fetch-notes.mjs 抓取生成。频道页必须带登录 Cookie，未登录时 notes 为空数组。',
+    channels: outChannels,
+  })
 
-  await fs.mkdir(path.dirname(OUT), { recursive: true })
-  await fs.writeFile(OUT, JSON.stringify(payload, null, 1), 'utf8')
-  console.log(`\n完成：去重后 ${notes.length} 条真实笔记 -> src/data/notes.json`)
-  console.log(`真实频道（需登录才能切换）：${payload.channels.join('、')}`)
+  const filled = outChannels.filter((c) => c.notes.length > 0)
+  console.log(
+    `\n频道：${filled.length}/${outChannels.length} 个有数据 -> src/data/channels.json` +
+      (filled.length ? `（${filled.map((c) => `${c.name} ${c.notes.length} 条`).join('、')}）` : '')
+  )
+  if (!filled.length) {
+    console.log('提示：配置登录 Cookie 后频道才会有数据，执行 `npm run login`。')
+  }
 }
 
-main()
+main().catch((e) => {
+  console.error('抓取异常：', e)
+  process.exit(1)
+})
