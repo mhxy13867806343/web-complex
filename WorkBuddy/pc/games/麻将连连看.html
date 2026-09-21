@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>麻将连连看 · WorkBuddy PC</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  .main { display:flex; gap:20px; align-items:flex-start; justify-content:center;
+    max-width:1060px; margin:0 auto; padding:20px 18px 40px; flex-wrap:wrap; }
+  canvas { display:block; border-radius:14px; cursor:pointer; }
+  .panel { width:240px; display:flex; flex-direction:column; gap:12px; }
+  .card-p { background:var(--bg-1); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .card-p h3 { margin:0 0 10px; font-size:14px; color:var(--txt-1); font-weight:600; }
+  .stats2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stats2 div { background:var(--bg-2); border-radius:9px; padding:7px 9px; text-align:center; }
+  .stats2 b { display:block; font-size:16px; font-variant-numeric:tabular-nums; }
+  .stats2 span { font-size:10.5px; color:var(--txt-1); }
+  .acts { display:flex; flex-wrap:wrap; gap:7px; }
+  .msg { font-size:12.5px; color:var(--txt-1); line-height:1.8; min-height:40px; }
+  .mask { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(6,10,20,.76); backdrop-filter:blur(4px); z-index:60; }
+  .mask.show { display:flex; }
+  @media (max-width:900px) { .main { flex-direction:column; align-items:center; } .panel { width:min(92vw,560px); } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="btn sm ghost" href="../index.html">← 返回</a>
+  <span class="title">麻将连连看 Mahjong Solitaire</span>
+  <span class="spacer"></span>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+</div>
+
+<div class="main">
+  <canvas id="cv"></canvas>
+  <div class="panel">
+    <div class="card-p">
+      <h3>状态</h3>
+      <div class="stats2">
+        <div><b id="rm">144</b><span>剩余</span></div>
+        <div><b id="pr">72</b><span>可消对</span></div>
+        <div><b id="sc">0</b><span>得分</span></div>
+        <div><b id="tm">00:00</b><span>用时</span></div>
+      </div>
+    </div>
+    <div class="card-p">
+      <h3>操作</h3>
+      <div class="acts">
+        <button class="btn sm primary" id="btnNew">新局</button>
+        <button class="btn sm ghost" id="btnHint">提示</button>
+        <button class="btn sm ghost" id="btnUndo">撤销</button>
+        <button class="btn sm ghost" id="btnShuffle">洗牌 <span id="sh">3</span></button>
+      </div>
+      <div class="msg" id="msg">选中两张相同的自由牌即可消除。自由牌 = 上方没被压住，且左右至少一侧空着。</div>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="mask">
+  <div class="dialog">
+    <h3 id="mt">🎉 全部消除</h3>
+    <p id="mp"></p>
+    <div class="row"><button class="btn primary" id="mBtn">再来一局</button></div>
+  </div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var TW = 38, TH = 52, OX = 10, OY = 10, LIFT = 5;   // 牌尺寸与层高
+  var UNIT_W = TW / 2, UNIT_H = TH / 2;
+
+  // ---------- 牌阵布局（经典龟形 144 张）----------
+  var LAYOUT = [];
+  function add(x, y, z) { LAYOUT.push({ x: x, y: y, z: z }); }
+  [[0, 12, 2], [2, 8, 4], [4, 10, 3], [6, 12, 2], [8, 12, 2], [10, 10, 3], [12, 8, 4], [14, 12, 2]]
+    .forEach(function (r) { for (var i = 0; i < r[1]; i++) add(r[2] + i * 2, r[0], 0); });
+  add(0, 7, 0); add(26, 7, 0); add(28, 7, 0);                       // 左右凸出的 3 张
+  [9, 11, 13, 15, 17, 19].forEach(function (x) { [2, 4, 6, 8, 10, 12].forEach(function (y) { add(x, y, 1); }); });
+  [11, 13, 15, 17].forEach(function (x) { [4, 6, 8, 10].forEach(function (y) { add(x, y, 2); }); });
+  [13, 15].forEach(function (x) { [6, 8].forEach(function (y) { add(x, y, 3); }); });
+  add(14, 7, 4);
+
+  var BOARD_W = 30 * UNIT_W + OX * 2, BOARD_H = 16 * UNIT_H + OY * 2 + LIFT * 4;
+
+  // ---------- 牌面 ----------
+  var FACES = [];
+  (function () {
+    var dots = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    dots.forEach(function (n) { for (var k = 0; k < 4; k++) FACES.push({ suit: 'dot', num: n }); });
+    dots.forEach(function (n) { for (var k = 0; k < 4; k++) FACES.push({ suit: 'bam', num: n }); });
+    dots.forEach(function (n) { for (var k = 0; k < 4; k++) FACES.push({ suit: 'chr', num: n }); });
+    ['E', 'S', 'W', 'N'].forEach(function (w) { for (var k = 0; k < 4; k++) FACES.push({ suit: 'wind', num: w }); });
+    ['red', 'green', 'white'].forEach(function (d) { for (var k = 0; k < 4; k++) FACES.push({ suit: 'drg', num: d }); });
+    ['春', '夏', '秋', '冬'].forEach(function (f) { FACES.push({ suit: 'season', num: f, group: 'season' }); });
+    ['梅', '兰', '竹', '菊'].forEach(function (f) { FACES.push({ suit: 'flower', num: f, group: 'flower' }); });
+  })();
+
+  var CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  var WIND_CN = { E: '东', S: '南', W: '西', N: '北' };
+
+  function sameFace(a, b) {
+    if (!a || !b) return false;
+    if (a.group) return a.group === b.group;
+    return a.suit === b.suit && a.num === b.num;
+  }
+
+  var tiles, sel, score, seconds, timer, shuffles, undoStack, hintPair, finished;
+  var uid = 0;
+
+  function newGame() {
+    var faces = FACES.slice();
+    for (var i = faces.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = faces[i]; faces[i] = faces[j]; faces[j] = t; }
+    tiles = LAYOUT.map(function (p, i) {
+      return { id: ++uid, x: p.x, y: p.y, z: p.z, face: faces[i], gone: false };
+    });
+    sel = null; score = 0; seconds = 0; shuffles = 3; undoStack = []; hintPair = null; finished = false;
+    document.getElementById('sh').textContent = '3';
+    clearInterval(timer);
+    timer = setInterval(function () {
+      if (finished) return;
+      seconds++;
+      document.getElementById('tm').textContent = fmt(seconds);
+    }, 1000);
+    document.getElementById('tm').textContent = '00:00';
+    document.getElementById('msg').textContent = '选中两张相同的自由牌即可消除。';
+    mask.classList.remove('show');
+    update(); draw();
+  }
+
+  function fmt(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+
+  // ---------- 自由牌判定 ----------
+  function isFree(t) {
+    if (t.gone) return false;
+    for (var i = 0; i < tiles.length; i++) {
+      var o = tiles[i]; if (o.gone) continue;
+      if (o.z === t.z + 1 && Math.abs(o.x - t.x) < 2 && Math.abs(o.y - t.y) < 2) return false;   // 被压住
+    }
+    var left = false, right = false;
+    for (var j = 0; j < tiles.length; j++) {
+      var p = tiles[j]; if (p.gone || p.z !== t.z) continue;
+      if (Math.abs(p.y - t.y) < 2) {
+        if (p.x === t.x - 2) left = true;
+        if (p.x === t.x + 2) right = true;
+      }
+    }
+    return !(left && right);
+  }
+
+  function freeTiles() { return tiles.filter(function (t) { return !t.gone && isFree(t); }); }
+
+  function findPair() {
+    var f = freeTiles();
+    for (var i = 0; i < f.length; i++) for (var j = i + 1; j < f.length; j++)
+      if (sameFace(f[i].face, f[j].face)) return [f[i], f[j]];
+    return null;
+  }
+
+  function remaining() { return tiles.filter(function (t) { return !t.gone; }).length; }
+
+  function update() {
+    var rm = remaining();
+    document.getElementById('rm').textContent = rm;
+    document.getElementById('sc').textContent = score;
+    document.getElementById('pr').textContent = Math.floor(rm / 2);
+  }
+
+  // ---------- 绘制 ----------
+  function setup() {
+    cv.width = BOARD_W * DPR; cv.height = BOARD_H * DPR;
+    cv.style.width = BOARD_W + 'px'; cv.style.height = BOARD_H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function tileXY(t) {
+    return { x: OX + t.x * UNIT_W - t.z * 2, y: OY + t.y * UNIT_H - t.z * LIFT };
+  }
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawFace(f, x, y, w, h) {
+    var cx = x + w / 2, cy = y + h / 2;
+    var col = { dot: '#1d4ed8', bam: '#15803d', chr: '#b91c1c', wind: '#0f172a', drg: '#b91c1c', season: '#7c3aed', flower: '#7c3aed' }[f.suit];
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (f.suit === 'dot') {                       // 筒：圆点
+      var n = f.num, cols = n <= 3 ? n : 3, rows = Math.ceil(n / cols);
+      var r = Math.min(w * 0.13, h * 0.1);
+      for (var i = 0; i < n; i++) {
+        var rr2 = Math.floor(i / cols), cc = i % cols;
+        var cnt = (rr2 === rows - 1) ? (n - rr2 * cols) : cols;
+        var px = cx + (cc - (cnt - 1) / 2) * (w * 0.26);
+        var py = cy + (rr2 - (rows - 1) / 2) * (h * 0.24);
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1; ctx.stroke();
+      }
+    } else if (f.suit === 'bam') {                // 条：竖条
+      var n2 = f.num, cols2 = n2 <= 3 ? n2 : 3, rows2 = Math.ceil(n2 / cols2);
+      for (var i2 = 0; i2 < n2; i2++) {
+        var r3 = Math.floor(i2 / cols2), c3 = i2 % cols2;
+        var cnt3 = (r3 === rows2 - 1) ? (n2 - r3 * cols2) : cols2;
+        var px2 = cx + (c3 - (cnt3 - 1) / 2) * (w * 0.26);
+        var py2 = cy + (r3 - (rows2 - 1) / 2) * (h * 0.24);
+        ctx.fillStyle = col;
+        rr(px2 - w * 0.05, py2 - h * 0.075, w * 0.1, h * 0.15, w * 0.04); ctx.fill();
+      }
+    } else if (f.suit === 'chr') {                // 万：汉字数字 + 万
+      ctx.fillStyle = col;
+      ctx.font = '700 ' + Math.round(h * 0.36) + 'px -apple-system,"PingFang SC",serif';
+      ctx.fillText(CN_NUM[f.num], cx, cy - h * 0.12);
+      ctx.font = '600 ' + Math.round(h * 0.24) + 'px -apple-system,"PingFang SC",serif';
+      ctx.fillText('万', cx, cy + h * 0.22);
+    } else if (f.suit === 'wind') {
+      ctx.fillStyle = col;
+      ctx.font = '700 ' + Math.round(h * 0.48) + 'px -apple-system,"PingFang SC",serif';
+      ctx.fillText(WIND_CN[f.num], cx, cy);
+    } else if (f.suit === 'drg') {
+      if (f.num === 'white') {
+        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2;
+        rr(cx - w * 0.24, cy - h * 0.2, w * 0.48, h * 0.4, 4); ctx.stroke();
+      } else {
+        ctx.fillStyle = f.num === 'red' ? '#b91c1c' : '#15803d';
+        ctx.font = '700 ' + Math.round(h * 0.48) + 'px -apple-system,"PingFang SC",serif';
+        ctx.fillText(f.num === 'red' ? '中' : '发', cx, cy);
+      }
+    } else {
+      ctx.fillStyle = col;
+      ctx.font = '700 ' + Math.round(h * 0.44) + 'px -apple-system,"PingFang SC",serif';
+      ctx.fillText(f.num, cx, cy);
+    }
+  }
+
+  function drawTile(t, highlight) {
+    var p = tileXY(t);
+    var x = p.x, y = p.y;
+    if (sel === t) { x -= 1; y -= 2; }
+    // 侧面（立体感）
+    ctx.fillStyle = '#a8895f';
+    rr(x + 3, y + 4, TW - 2, TH - 2, 5); ctx.fill();
+    // 顶面
+    var g = ctx.createLinearGradient(x, y, x, y + TH);
+    g.addColorStop(0, '#fffdf6'); g.addColorStop(1, '#f0e6cf');
+    ctx.fillStyle = g;
+    rr(x, y, TW - 2, TH - 2, 5); ctx.fill();
+    ctx.strokeStyle = highlight ? '#4f8cff' : 'rgba(60,45,20,.35)';
+    ctx.lineWidth = highlight ? 2.5 : 1;
+    rr(x, y, TW - 2, TH - 2, 5); ctx.stroke();
+    if (sel === t) { ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2.5; rr(x, y, TW - 2, TH - 2, 5); ctx.stroke(); }
+    drawFace(t.face, x, y, TW - 2, TH - 2);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, BOARD_W, BOARD_H);
+    ctx.fillStyle = 'rgba(255,255,255,.03)'; rr(0, 0, BOARD_W, BOARD_H, 12); ctx.fill();
+    var order = tiles.filter(function (t) { return !t.gone; })
+      .sort(function (a, b) { return (a.z - b.z) || (a.y - b.y) || (a.x - b.x); });
+    var hintSet = {};
+    if (hintPair) { hintSet[hintPair[0].id] = 1; hintSet[hintPair[1].id] = 1; }
+    order.forEach(function (t) {
+      drawTile(t, hintSet[t.id]);
+      if (!isFree(t)) {        // 非自由牌压暗
+        var p = tileXY(t);
+        ctx.fillStyle = 'rgba(20,26,44,.34)';
+        rr(p.x, p.y, TW - 2, TH - 2, 5); ctx.fill();
+      }
+    });
+  }
+
+  // ---------- 交互 ----------
+  tiles = [];
+  var uid = 0;
+
+  function rebuild() { tiles.forEach(function (t, i) { if (!t.id) t.id = ++uid; }); }
+
+  function hit(mx, my) {
+    // 从上往下命中
+    var order = tiles.filter(function (t) { return !t.gone; })
+      .sort(function (a, b) { return (b.z - a.z) || (b.y - a.y) || (b.x - a.x); });
+    for (var i = 0; i < order.length; i++) {
+      var t = order[i], p = tileXY(t);
+      if (mx >= p.x && mx <= p.x + TW - 2 && my >= p.y && my <= p.y + TH - 2) return t;
+    }
+    return null;
+  }
+
+  cv.addEventListener('click', function (e) {
+    var r = cv.getBoundingClientRect();
+    var mx = (e.clientX - r.left) * (BOARD_W / r.width), my = (e.clientY - r.top) * (BOARD_H / r.height);
+    var t = hit(mx, my);
+    if (!t) { sel = null; draw(); return; }
+    WB.sfx.unlock();
+    if (!isFree(t)) { WB.sfx.play('error'); document.getElementById('msg').textContent = '这张牌被压住或左右都被夹住了。'; return; }
+    if (sel === t) { sel = null; WB.sfx.play('click'); draw(); return; }
+    if (!sel) { sel = t; WB.sfx.play('tap'); draw(); return; }
+    if (sameFace(sel.face, t.face)) {
+      undoStack.push([sel, t]);
+      sel.gone = true; t.gone = true;
+      score += 20; WB.sfx.play('clear');
+      sel = null; hintPair = null;
+      update(); draw();
+      if (remaining() === 0) {
+        finished = true; clearInterval(timer); WB.sfx.play('win');
+        document.getElementById('mt').textContent = '🎉 全部消除';
+        document.getElementById('mp').textContent = '用时 ' + fmt(seconds) + ' · 得分 ' + score;
+        mask.classList.add('show');
+      } else if (!findPair()) {
+        document.getElementById('msg').textContent = '没有可消的对了，点「洗牌」重排剩余牌面。';
+        WB.sfx.play('lose');
+      }
+    } else {
+      WB.sfx.play('error');
+      document.getElementById('msg').textContent = '两张牌不一样，换一张试试。';
+      sel = t; draw();
+    }
+  });
+
+  document.getElementById('btnHint').onclick = function () {
+    var p = findPair();
+    if (!p) { document.getElementById('msg').textContent = '没有可消的对了，点「洗牌」重排剩余牌面。'; WB.sfx.play('error'); return; }
+    hintPair = p; WB.sfx.play('tick'); draw();
+    setTimeout(function () { hintPair = null; draw(); }, 1600);
+  };
+
+  document.getElementById('btnUndo').onclick = function () {
+    var p = undoStack.pop();
+    if (!p) { WB.sfx.play('error'); return; }
+    p[0].gone = false; p[1].gone = false;
+    score = Math.max(0, score - 20); sel = null; finished = false;
+    WB.sfx.play('undo'); update(); draw();
+  };
+
+  document.getElementById('btnShuffle').onclick = function () {
+    if (shuffles <= 0) { WB.sfx.play('error'); document.getElementById('msg').textContent = '洗牌次数用完了。'; return; }
+    var left = tiles.filter(function (t) { return !t.gone; });
+    var faces = left.map(function (t) { return t.face; });
+    for (var i = faces.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var tp = faces[i]; faces[i] = faces[j]; faces[j] = tp; }
+    left.forEach(function (t, i) { t.face = faces[i]; });
+    shuffles--; document.getElementById('sh').textContent = shuffles;
+    sel = null; WB.sfx.play('start');
+    document.getElementById('msg').textContent = '已重排剩余牌面。';
+    update(); draw();
+  };
+
+  document.getElementById('btnNew').onclick = function () { WB.sfx.play('start'); newGame(); };
+  document.getElementById('mBtn').onclick = function () { WB.sfx.play('start'); newGame(); };
+  document.getElementById('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
+
+  setup(); newGame(); draw();
+})();
+</script>
+</body>
+</html>

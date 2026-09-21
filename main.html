@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WorkBuddy 游戏目录 · web-complex</title>
+<link rel="stylesheet" href="WorkBuddy/shared/theme.css">
+<style>
+  .sect { margin-top: 26px; }
+  .sect h2 { font-size: 17px; margin: 0 0 4px; }
+  .sect .desc { font-size: 12.5px; color: var(--txt-1); margin-bottom: 12px; }
+  .banner { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
+  .banner a { flex:1 1 220px; display:block; padding:18px; border-radius:16px; text-decoration:none;
+    border:1px solid var(--line); background:linear-gradient(135deg,rgba(79,140,255,.14),rgba(34,211,238,.07)); }
+  .banner a:hover { border-color:var(--acc); transform:translateY(-2px); }
+  .banner .t { font-size:16px; font-weight:600; color:var(--txt-0); margin-bottom:6px; }
+  .banner .d { font-size:12.5px; color:var(--txt-1); line-height:1.6; }
+  .links { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  code { background:var(--bg-2); padding:2px 6px; border-radius:5px; font-size:12px; color:#9dc0ff; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="hero">
+    <h1>WorkBuddy 游戏目录</h1>
+    <p>web-complex · 纯前端单文件小游戏集合 · 打开即玩，无需构建</p>
+  </div>
+
+  <div class="banner">
+    <a href="WorkBuddy/h5/index.html">
+      <div class="t">📱 H5 端 · 移动端</div>
+      <div class="d">2048、球球分类、木块拼图、贪吃蛇。触屏滑动与点按，竖屏适配。</div>
+    </a>
+    <a href="WorkBuddy/pc/index.html">
+      <div class="t">🖥️ PC 端 · 桌面端</div>
+      <div class="d">数独、麻将连连看、华容道、泡泡龙。鼠标与键盘操作，大屏布局。</div>
+    </a>
+  </div>
+
+  <div class="sect">
+    <h2>全部游戏</h2>
+    <div class="desc">点击直接开始；手机建议走 H5 端，电脑建议走 PC 端。</div>
+    <div class="grid">
+      <a class="gcard" href="WorkBuddy/h5/games/2048.html">
+        <div class="ico">🔢</div><div class="nm">2048</div>
+        <div class="ds">滑动合并相同数字，凑到 2048。</div><span class="tag">H5</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/h5/games/%E7%90%83%E7%90%83%E5%88%86%E7%B1%BB.html">
+        <div class="ico">🧪</div><div class="nm">球球分类</div>
+        <div class="ds">把同色小球归拢进同一根管子。</div><span class="tag">H5</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/h5/games/%E6%9C%A8%E5%9D%97%E6%8B%BC%E5%9B%BE.html">
+        <div class="ico">🧱</div><div class="nm">木块拼图</div>
+        <div class="ds">拖块入盘，填满行列即消除。</div><span class="tag">H5</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/h5/games/%E8%B4%AA%E5%90%83%E8%9B%87.html">
+        <div class="ico">🐍</div><div class="nm">贪吃蛇</div>
+        <div class="ds">吃果子变长，别撞墙别咬自己。</div><span class="tag">H5</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/pc/games/%E6%95%B0%E7%8B%AC.html">
+        <div class="ico">🧩</div><div class="nm">数独</div>
+        <div class="ds">四档难度，笔记模式与提示。</div><span class="tag">PC</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/pc/games/%E9%BA%BB%E5%B0%86%E8%BF%9E%E8%BF%9E%E7%9C%8B.html">
+        <div class="ico">🀄</div><div class="nm">麻将连连看</div>
+        <div class="ds">144 张龟形牌阵，配对消除。</div><span class="tag">PC</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/pc/games/%E5%8D%8E%E5%AE%B9%E9%81%93.html">
+        <div class="ico">🔲</div><div class="nm">华容道</div>
+        <div class="ds">数字滑块复原，三种规模。</div><span class="tag">PC</span>
+      </a>
+      <a class="gcard" href="WorkBuddy/pc/games/%E6%B3%A1%E6%B3%A1%E9%BE%99.html">
+        <div class="ico">🫧</div><div class="nm">泡泡龙</div>
+        <div class="ds">瞄准发射，三消加掉落。</div><span class="tag">PC</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>目录结构</h2>
+    <div class="desc">所有游戏共用 <code>WorkBuddy/shared</code> 下的音效库与主题样式。</div>
+    <div class="card" style="padding:16px;font-size:13px;line-height:2;color:var(--txt-1)">
+      <code>main.html</code> 本页 · 共用目录入口<br>
+      <code>WorkBuddy/h5/games/</code> 移动端游戏（单文件 HTML）<br>
+      <code>WorkBuddy/pc/games/</code> 桌面端游戏（单文件 HTML）<br>
+      <code>WorkBuddy/shared/audio.js</code> WebAudio 实时合成音效库<br>
+      <code>WorkBuddy/shared/theme.css</code> 共用深色主题样式
+    </div>
+  </div>
+
+  <div class="foot">
+    许可证：<a href="LICENSE.md">中文</a> · <a href="LICENSE-EN.md">English</a><br>
+    游戏玩法参考 Puzzle Level 等公开益智玩法，代码与美术均为本仓库原创实现，不含第三方版权素材。
+  </div>
+</div>
+
+</body>
+</html>

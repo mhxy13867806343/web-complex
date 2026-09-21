@@ -1,0 +1,179 @@
+/* ============================================================
+ * WorkBuddy 共用主题样式
+ * 深色科技风，H5 / PC 端游戏与索引页共用。
+ * 只依赖系统字体，不引入任何第三方字体或图标库。
+ * ============================================================ */
+
+:root {
+  --bg-0: #0b0f1a;          /* 页面底色 */
+  --bg-1: #131a2b;          /* 卡片底色 */
+  --bg-2: #1c2740;          /* 卡片悬停 / 内嵌面板 */
+  --line: #26324d;          /* 分隔线 */
+  --txt-0: #eaf0ff;         /* 主文字 */
+  --txt-1: #9aa8c7;         /* 次要文字 */
+  --acc: #4f8cff;           /* 主强调色 */
+  --acc-2: #22d3ee;         /* 次强调色 */
+  --ok: #34d399;            /* 成功 / 得分 */
+  --warn: #fbbf24;          /* 提示 */
+  --bad: #f87171;           /* 失败 / 危险 */
+  --radius: 14px;
+  --shadow: 0 8px 28px rgba(0, 0, 0, .38);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-0);
+  color: var(--txt-0);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+               "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 600px at 12% -10%, rgba(79, 140, 255, .16), transparent 60%),
+    radial-gradient(900px 520px at 92% 0%, rgba(34, 211, 238, .12), transparent 62%),
+    var(--bg-0);
+}
+
+/* ---------- 布局容器 ---------- */
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 18px 56px;
+}
+
+/* ---------- 顶部标题 ---------- */
+.hero { text-align: center; padding: 28px 10px 18px; }
+.hero h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  letter-spacing: .5px;
+  background: linear-gradient(92deg, var(--acc), var(--acc-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero p { margin: 0; color: var(--txt-1); font-size: 14px; }
+
+/* ---------- 返回条 ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(19, 26, 43, .72);
+  backdrop-filter: blur(8px);
+  position: sticky; top: 0; z-index: 20;
+}
+.topbar .title { font-weight: 600; font-size: 15px; }
+.topbar .spacer { flex: 1; }
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--txt-0);
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform .12s ease, background .16s ease, border-color .16s ease;
+  user-select: none;
+}
+.btn:hover { background: #24314f; border-color: #35456b; }
+.btn:active { transform: scale(.96); }
+.btn.primary {
+  background: linear-gradient(92deg, var(--acc), #6ea8ff);
+  border-color: transparent; color: #06122b; font-weight: 600;
+}
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 6px 11px; font-size: 13px; border-radius: 8px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* ---------- 游戏列表 ---------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.gcard {
+  display: block; padding: 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none; color: var(--txt-0);
+  transition: transform .14s ease, border-color .16s ease, background .16s ease;
+}
+.gcard:hover { transform: translateY(-3px); border-color: var(--acc); background: var(--bg-2); }
+.gcard .ico { font-size: 26px; line-height: 1; margin-bottom: 10px; }
+.gcard .nm { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.gcard .ds { font-size: 12.5px; color: var(--txt-1); line-height: 1.6; min-height: 40px; }
+.gcard .tag {
+  display: inline-block; margin-top: 10px; padding: 2px 8px;
+  font-size: 11px; border-radius: 999px;
+  background: rgba(79, 140, 255, .16); color: #9dc0ff;
+}
+
+/* ---------- 统计条 ---------- */
+.stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.stat {
+  min-width: 78px; padding: 8px 12px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px;
+  text-align: center;
+}
+.stat b { display: block; font-size: 19px; color: var(--txt-0); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11.5px; color: var(--txt-1); }
+
+/* ---------- 遮罩弹层 ---------- */
+.mask {
+  position: fixed; inset: 0; z-index: 50;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(6, 10, 20, .74);
+  backdrop-filter: blur(4px);
+}
+.mask.show { display: flex; }
+.dialog {
+  width: min(90vw, 340px); padding: 24px;
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: 18px; box-shadow: var(--shadow); text-align: center;
+}
+.dialog h3 { margin: 0 0 10px; font-size: 20px; }
+.dialog p { margin: 0 0 18px; color: var(--txt-1); font-size: 14px; line-height: 1.7; }
+.dialog .row { display: flex; gap: 10px; justify-content: center; }
+
+/* ---------- 页脚 ---------- */
+.foot {
+  margin-top: 34px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+  text-align: center; color: var(--txt-1); font-size: 12.5px; line-height: 1.9;
+}
+.foot a { color: #9dc0ff; text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
+
+/* ---------- 工具类 ---------- */
+.center { text-align: center; }
+.mt { margin-top: 16px; }
+.hide { display: none !important; }
+
+/* ---------- 小屏适配 ---------- */
+@media (max-width: 560px) {
+  .wrap { padding: 16px 12px 40px; }
+  .hero h1 { font-size: 24px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .gcard { padding: 13px; }
+}

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>木块拼图 · WorkBuddy H5</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  body { display:flex; flex-direction:column; align-items:center; padding:14px 12px 24px; }
+  .head { width:100%; max-width:440px; display:flex; align-items:flex-end; gap:10px; margin-bottom:10px; }
+  .head h1 { margin:0; font-size:25px;
+    background:linear-gradient(92deg,#4f8cff,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .head .sub { font-size:11.5px; color:var(--txt-1); }
+  .scores { margin-left:auto; display:flex; gap:8px; }
+  .scores .s { min-width:62px; padding:5px 9px; background:var(--bg-1); border:1px solid var(--line);
+    border-radius:9px; text-align:center; }
+  .scores .s b { display:block; font-size:16px; font-variant-numeric:tabular-nums; }
+  .scores .s span { font-size:10.5px; color:var(--txt-1); }
+  .bar { width:100%; max-width:440px; display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .bar .tip { font-size:12px; color:var(--txt-1); flex:1; }
+  .stage { position:relative; width:100%; max-width:440px; }
+  canvas { width:100%; display:block; touch-action:none; }
+  .over { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(11,15,26,.84); border-radius:14px; backdrop-filter:blur(3px); }
+  .over.show { display:flex; }
+  .over h2 { margin:0; font-size:26px; }
+  .over p { margin:0; color:var(--txt-1); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>木块拼图</h1>
+    <div class="sub">拖入方块 · 填满整行整列消除</div>
+  </div>
+  <div class="scores">
+    <div class="s"><b id="sc">0</b><span>得分</span></div>
+    <div class="s"><b id="bs">0</b><span>最高</span></div>
+  </div>
+</div>
+
+<div class="bar">
+  <button class="btn sm ghost" id="btnNew">重开</button>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+  <span class="tip">拖动下方木块放到棋盘</span>
+</div>
+
+<div class="stage">
+  <canvas id="cv"></canvas>
+  <div class="over" id="over">
+    <h2>游戏结束</h2>
+    <p id="overP"></p>
+    <div class="row" style="display:flex;gap:10px">
+      <button class="btn primary" id="btnAgain">再来一局</button>
+      <a class="btn ghost" href="../index.html">返回列表</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var N = 10;
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var elSc = document.getElementById('sc'), elBs = document.getElementById('bs');
+  var over = document.getElementById('over'), overP = document.getElementById('overP');
+
+  // ---- 形状库：1 表示占位 ----
+  var SHAPES = [
+    { m: [[1]] },
+    { m: [[1, 1]] }, { m: [[1], [1]] },
+    { m: [[1, 1, 1]] }, { m: [[1], [1], [1]] },
+    { m: [[1, 1, 1, 1]] }, { m: [[1], [1], [1], [1]] },
+    { m: [[1, 1], [1, 1]] },
+    { m: [[1, 1, 1], [1, 1, 1], [1, 1, 1]] },
+    { m: [[1, 1], [1, 0]] }, { m: [[1, 1], [0, 1]] },
+    { m: [[1, 0], [1, 1]] }, { m: [[0, 1], [1, 1]] },
+    { m: [[1, 1, 1], [1, 0, 0]] }, { m: [[1, 1, 1], [0, 0, 1]] },
+    { m: [[1, 0, 0], [1, 1, 1]] }, { m: [[0, 0, 1], [1, 1, 1]] },
+    { m: [[1, 1, 1], [0, 1, 0]] }, { m: [[0, 1, 0], [1, 1, 1]] },
+    { m: [[1, 1, 0], [0, 1, 1]] }, { m: [[0, 1, 1], [1, 1, 0]] },
+    { m: [[1, 1, 1, 1], [1, 0, 0, 0]] }, { m: [[1, 0, 0, 0], [1, 1, 1, 1]] },
+    { m: [[1], [1], [1], [1]] }, { m: [[1, 1, 1, 1, 1]] }
+  ];
+  var COLORS = ['#ff6b6b','#ffa94d','#ffd43b','#51cf66','#38d9a9','#4dabf7','#9775fa','#f783ac'];
+
+  function mkShape() {
+    var s = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+    var cells = [];
+    s.m.forEach(function (row, r) {
+      row.forEach(function (v, c) { if (v) cells.push([r, c]); });
+    });
+    return {
+      cells: cells, h: s.m.length, w: s.m[0].length,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      used: false
+    };
+  }
+
+  var board, tray, score, best, drag, clearing, anim;
+
+  best = parseInt(localStorage.getItem('wbblock_best') || '0', 10) || 0;
+  elBs.textContent = best;
+
+  function reset() {
+    board = [];
+    for (var r = 0; r < N; r++) { board.push([]); for (var c = 0; c < N; c++) board[r].push(null); }
+    score = 0; elSc.textContent = '0';
+    clearing = []; anim = 0;
+    drag = null;
+    newTray();
+    over.classList.remove('show');
+    draw();
+  }
+
+  function newTray() { tray = [mkShape(), mkShape(), mkShape()]; }
+
+  // ---- 布局 ----
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0, cell = 0, pad = 0, boardPx = 0, trayTop = 0, trayH = 0;
+
+  function layout() {
+    W = Math.min(cv.parentNode.clientWidth, 440);
+    pad = Math.round(W * 0.018);
+    cell = (W - pad * 2) / N;
+    boardPx = W;
+    trayH = Math.round(W * 0.27);
+    trayTop = boardPx + Math.round(W * 0.03);
+    H = trayTop + trayH + 8;
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    draw();
+  }
+
+  function gx(c) { return pad + c * cell; }
+  function gy(r) { return pad + r * cell; }
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawCell(x, y, size, color, alpha) {
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    var g = ctx.createLinearGradient(x, y, x, y + size);
+    g.addColorStop(0, color); g.addColorStop(1, shade(color, -0.24));
+    rr(x + size * 0.04, y + size * 0.04, size * 0.92, size * 0.92, size * 0.16);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function shade(hex, amt) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.max(0, Math.min(255, Math.round(r + 255 * amt)));
+    g = Math.max(0, Math.min(255, Math.round(g + 255 * amt)));
+    b = Math.max(0, Math.min(255, Math.round(b + 255 * amt)));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function slotRect(i) {
+    var w = W / 3;
+    return { x: i * w, y: trayTop, w: w, h: trayH };
+  }
+
+  function fits(shape, gr, gc) {
+    for (var k = 0; k < shape.cells.length; k++) {
+      var r = gr + shape.cells[k][0], c = gc + shape.cells[k][1];
+      if (r < 0 || r >= N || c < 0 || c >= N) return false;
+      if (board[r][c]) return false;
+    }
+    return true;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // 棋盘底
+    ctx.fillStyle = '#1c2740'; rr(0, 0, boardPx, boardPx, 14); ctx.fill();
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+      ctx.fillStyle = 'rgba(255,255,255,.045)';
+      rr(gx(c) + 1.5, gy(r) + 1.5, cell - 3, cell - 3, cell * 0.14); ctx.fill();
+    }
+    // 已放置的块
+    for (var r2 = 0; r2 < N; r2++) for (var c2 = 0; c2 < N; c2++) {
+      var v = board[r2][c2]; if (!v) continue;
+      var a = 1;
+      if (clearing.length) {
+        for (var i = 0; i < clearing.length; i++) {
+          if ((clearing[i].t === 'r' && clearing[i].i === r2) || (clearing[i].t === 'c' && clearing[i].i === c2)) {
+            a = 1 - anim; break;
+          }
+        }
+      }
+      if (a <= 0.02) continue;
+      drawCell(gx(c2), gy(r2), cell, v, a);
+    }
+    // 拖拽预览
+    if (drag && drag.onBoard) {
+      var ok = fits(drag.shape, drag.gr, drag.gc);
+      drag.shape.cells.forEach(function (p) {
+        var r = drag.gr + p[0], c = drag.gc + p[1];
+        if (r < 0 || r >= N || c < 0 || c >= N) return;
+        ctx.globalAlpha = 0.42;
+        ctx.fillStyle = ok ? '#34d399' : '#f87171';
+        rr(gx(c) + 1.5, gy(r) + 1.5, cell - 3, cell - 3, cell * 0.14); ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+      if (ok) {   // 提示将被消除的行列
+        var rows = {}, cols = {};
+        drag.shape.cells.forEach(function (p) { rows[drag.gr + p[0]] = 1; cols[drag.gc + p[1]] = 1; });
+        Object.keys(rows).forEach(function (k) {
+          if (rowFull(+k)) { ctx.fillStyle = 'rgba(52,211,153,.16)'; ctx.fillRect(pad, gy(+k), cell * N, cell); }
+        });
+        Object.keys(cols).forEach(function (k) {
+          if (colFull(+k)) { ctx.fillStyle = 'rgba(52,211,153,.16)'; ctx.fillRect(gx(+k), pad, cell, cell * N); }
+        });
+      }
+    }
+    // 托盘
+    for (var s = 0; s < tray.length; s++) {
+      var sh = tray[s];
+      if (!sh || sh.used) continue;
+      if (drag && drag.slot === s && drag.onBoard) continue;
+      var box = slotRect(s);
+      ctx.fillStyle = 'rgba(255,255,255,.035)';
+      rr(box.x + 5, box.y + 5, box.w - 10, box.h - 10, 12); ctx.fill();
+      drawShapeIn(sh, box, 0.62);
+    }
+    // 跟随手指的块
+    if (drag && drag.onBoard) {
+      drag.shape.cells.forEach(function (p) {
+        drawCell(gx(drag.gc + p[1]), gy(drag.gr + p[0]), cell, drag.shape.color, 0.92);
+      });
+    }
+  }
+
+  function drawShapeIn(sh, box, scale) {
+    var maxCell = Math.min((box.w - 16) / sh.w, (box.h - 16) / sh.h, cell * scale);
+    var w = sh.w * maxCell, h = sh.h * maxCell;
+    var ox = box.x + (box.w - w) / 2, oy = box.y + (box.h - h) / 2;
+    sh.cells.forEach(function (p) { drawCell(ox + p[1] * maxCell, oy + p[0] * maxCell, maxCell, sh.color); });
+  }
+
+  function rowFull(r) { for (var c = 0; c < N; c++) if (!board[r][c]) return false; return true; }
+  function colFull(c) { for (var r = 0; r < N; r++) if (!board[r][c]) return false; return true; }
+
+  function place(shape, gr, gc) {
+    shape.cells.forEach(function (p) { board[gr + p[0]][gc + p[1]] = shape.color; });
+    score += shape.cells.length;
+    var rows = [], cols = [];
+    for (var r = 0; r < N; r++) if (rowFull(r)) rows.push(r);
+    for (var c = 0; c < N; c++) if (colFull(c)) cols.push(c);
+    var lines = rows.length + cols.length;
+    if (lines) {
+      score += lines * 10 + Math.max(0, lines - 1) * 5;
+      if (lines >= 2) WB.sfx.play('combo', lines); else WB.sfx.play('clear');
+      clearing = rows.map(function (r) { return { t: 'r', i: r }; })
+        .concat(cols.map(function (c) { return { t: 'c', i: c }; }));
+      anim = 0;
+      var t0 = performance.now();
+      (function frame(now) {
+        anim = Math.min(1, (now - t0) / 240);
+        draw();
+        if (anim < 1) requestAnimationFrame(frame);
+        else {
+          clearing.forEach(function (o) {
+            if (o.t === 'r') for (var c = 0; c < N; c++) board[o.i][c] = null;
+            else for (var r = 0; r < N; r++) board[r][o.i] = null;
+          });
+          clearing = []; anim = 0; draw(); afterPlace();
+        }
+      })(t0);
+    } else {
+      WB.sfx.play('drop');
+      afterPlace();
+    }
+    elSc.textContent = score;
+    if (score > best) { best = score; elBs.textContent = best; localStorage.setItem('wbblock_best', best); }
+  }
+
+  function afterPlace() {
+    if (tray.every(function (s) { return s.used; })) newTray();
+    if (!hasMove()) { WB.sfx.play('lose'); overP.textContent = '没有能放下的木块了 · 得分 ' + score; over.classList.add('show'); }
+  }
+
+  function hasMove() {
+    for (var s = 0; s < tray.length; s++) {
+      var sh = tray[s]; if (!sh || sh.used) continue;
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (fits(sh, r, c)) return true;
+    }
+    return false;
+  }
+
+  // ---- 拖拽输入 ----
+  function pos(e) {
+    var r = cv.getBoundingClientRect();
+    var p = e.touches ? e.touches[0] : e;
+    return { x: (p.clientX - r.left) * (W / r.width), y: (p.clientY - r.top) * (W / r.width) };
+  }
+
+  function slotAt(x, y) {
+    for (var i = 0; i < 3; i++) {
+      var b = slotRect(i);
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return i;
+    }
+    return -1;
+  }
+
+  function onDown(e) {
+    if (clearing.length) return;
+    var p = pos(e); WB.sfx.unlock();
+    var s = slotAt(p.x, p.y);
+    if (s < 0 || !tray[s] || tray[s].used) return;
+    drag = { slot: s, shape: tray[s], onBoard: false, gr: 0, gc: 0 };
+    updateDrag(p);
+    WB.sfx.play('tap');
+    draw();
+  }
+
+  function updateDrag(p) {
+    if (!drag) return;
+    var sh = drag.shape;
+    var lift = cell * 1.15;                       // 手指上方偏移，避免遮挡
+    var x = p.x - sh.w * cell / 2;
+    var y = p.y - sh.h * cell / 2 - lift;
+    drag.onBoard = (y + sh.h * cell / 2) < boardPx + cell * 0.6;
+    if (drag.onBoard) {
+      drag.gr = Math.round((y - pad) / cell);
+      drag.gc = Math.round((x - pad) / cell);
+      drag.gr = Math.max(-2, Math.min(N, drag.gr));
+      drag.gc = Math.max(-2, Math.min(N, drag.gc));
+    }
+  }
+
+  function onMove(e) { if (!drag) return; e.preventDefault(); updateDrag(pos(e)); draw(); }
+
+  function onUp(e) {
+    if (!drag) return;
+    if (drag.onBoard && fits(drag.shape, drag.gr, drag.gc)) {
+      drag.shape.used = true;
+      var sh = drag.shape, gr = drag.gr, gc = drag.gc;
+      drag = null;
+      place(sh, gr, gc);
+      draw();
+    } else {
+      if (drag.onBoard) WB.sfx.play('error');
+      drag = null; draw();
+    }
+  }
+
+  cv.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(e); }, { passive: false });
+  cv.addEventListener('touchmove', function (e) { onMove(e); }, { passive: false });
+  cv.addEventListener('touchend', function (e) { e.preventDefault(); onUp(e); }, { passive: false });
+  cv.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', function (e) { if (drag) onMove(e); });
+  window.addEventListener('mouseup', function (e) { if (drag) onUp(e); });
+
+  document.getElementById('btnNew').onclick = function () { WB.sfx.play('start'); reset(); };
+  document.getElementById('btnAgain').onclick = function () { WB.sfx.play('start'); reset(); };
+  document.getElementById('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
+  window.addEventListener('resize', layout);
+
+  reset(); layout();
+})();
+</script>
+</body>
+</html>

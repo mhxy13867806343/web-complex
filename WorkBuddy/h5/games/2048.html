@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>2048 · WorkBuddy H5</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  body { display:flex; flex-direction:column; align-items:center; padding:14px 12px 24px; }
+  .head { width:100%; max-width:420px; display:flex; align-items:flex-end; gap:10px; margin-bottom:12px; }
+  .head h1 { margin:0; font-size:26px; letter-spacing:.5px;
+    background:linear-gradient(92deg,#4f8cff,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .head .sub { font-size:11.5px; color:var(--txt-1); margin-left:2px; }
+  .scores { margin-left:auto; display:flex; gap:8px; }
+  .scores .s { min-width:66px; padding:5px 9px; background:var(--bg-1); border:1px solid var(--line);
+    border-radius:9px; text-align:center; }
+  .scores .s b { display:block; font-size:17px; font-variant-numeric:tabular-nums; }
+  .scores .s span { font-size:10.5px; color:var(--txt-1); }
+  .bar { width:100%; max-width:420px; display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .bar .tip { font-size:12px; color:var(--txt-1); flex:1; }
+  .stage { position:relative; width:100%; max-width:420px; }
+  canvas { width:100%; display:block; border-radius:14px; touch-action:none; }
+  .over { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(11,15,26,.82); border-radius:14px; backdrop-filter:blur(3px); }
+  .over.show { display:flex; }
+  .over h2 { margin:0; font-size:26px; }
+  .over p { margin:0; color:var(--txt-1); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>2048</h1>
+    <div class="sub">滑动合并 · 冲到 2048</div>
+  </div>
+  <div class="scores">
+    <div class="s"><b id="score">0</b><span>得分</span></div>
+    <div class="s"><b id="best">0</b><span>最高</span></div>
+  </div>
+</div>
+
+<div class="bar">
+  <button class="btn sm ghost" id="btnUndo">撤销</button>
+  <button class="btn sm ghost" id="btnNew">重开</button>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+  <span class="tip">滑动屏幕或按方向键</span>
+</div>
+
+<div class="stage">
+  <canvas id="cv"></canvas>
+  <div class="over" id="over">
+    <h2 id="overT">游戏结束</h2>
+    <p id="overP"></p>
+    <div class="row" style="display:flex;gap:10px">
+      <button class="btn primary" id="btnAgain">再来一局</button>
+      <a class="btn ghost" href="../index.html">返回列表</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var N = 4;
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var elScore = document.getElementById('score'), elBest = document.getElementById('best');
+  var over = document.getElementById('over'), overT = document.getElementById('overT'), overP = document.getElementById('overP');
+
+  // ---- 配色（经典 2048 色板）----
+  var COLORS = {
+    2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',
+    128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'
+  };
+  function tileColor(v){ return COLORS[v] || '#3c3a32'; }
+  function textColor(v){ return (v===2||v===4) ? '#776e65' : '#f9f6f2'; }
+  function fontSize(v){ var s = v<100?38:v<1000?32:v<10000?26:22; return s; }
+
+  // ---- 状态 ----
+  var grid, tiles, dying, score, best, history, animating, won;
+  var uid = 0;
+
+  best = parseInt(localStorage.getItem('wb2048_best') || '0', 10) || 0;
+  elBest.textContent = best;
+
+  function Tile(r, c, v) {
+    this.id = ++uid; this.r = r; this.c = c; this.v = v;
+    this.x = c; this.y = r;      // 显示坐标（格单位，缓动到 r/c）
+    this.scale = 0;              // 出现动画
+    this.pop = 0;                // 合并弹跳
+    this.dead = false;
+  }
+
+  function reset() {
+    grid = []; tiles = []; dying = []; score = 0; history = null; animating = false; won = false;
+    for (var r = 0; r < N; r++) { grid.push([]); for (var c = 0; c < N; c++) grid[r].push(null); }
+    elScore.textContent = '0';
+    over.classList.remove('show');
+    spawn(); spawn();
+    draw();
+  }
+
+  function emptyCells() {
+    var out = [];
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!grid[r][c]) out.push({ r: r, c: c });
+    return out;
+  }
+
+  function spawn() {
+    var e = emptyCells(); if (!e.length) return;
+    var p = e[Math.floor(Math.random() * e.length)];
+    var t = new Tile(p.r, p.c, Math.random() < 0.9 ? 2 : 4);
+    tiles.push(t); grid[p.r][p.c] = t;
+    return t;
+  }
+
+  function snapshot() {
+    return { cells: tiles.map(function (t) { return { r: t.r, c: t.c, v: t.v }; }), score: score };
+  }
+  function restore(s) {
+    grid = []; tiles = []; dying = [];
+    for (var r = 0; r < N; r++) { grid.push([]); for (var c = 0; c < N; c++) grid[r].push(null); }
+    s.cells.forEach(function (o) {
+      var t = new Tile(o.r, o.c, o.v); t.scale = 1; tiles.push(t); grid[o.r][o.c] = t;
+    });
+    score = s.score; elScore.textContent = score;
+    over.classList.remove('show');
+    draw();
+  }
+
+  var VEC = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] };
+
+  function move(dir) {
+    if (animating) return;
+    var v = VEC[dir]; if (!v) return;
+    var snap = snapshot();
+    tiles.forEach(function (t) { t.mergedTurn = false; });
+    var moved = false, gained = 0, maxV = 0;
+
+    // 遍历顺序：沿移动方向的尽头先处理
+    var rs = [], cs = [];
+    for (var i = 0; i < N; i++) { rs.push(i); cs.push(i); }
+    if (v[0] > 0) rs.reverse();
+    if (v[1] > 0) cs.reverse();
+
+    rs.forEach(function (r) {
+      cs.forEach(function (c) {
+        var t = grid[r][c]; if (!t) return;
+        // 找到最远的空位
+        var nr = r, nc = c;
+        while (true) {
+          var tr = nr + v[0], tc = nc + v[1];
+          if (tr < 0 || tr >= N || tc < 0 || tc >= N) break;
+          if (grid[tr][tc]) break;
+          nr = tr; nc = tc;
+        }
+        var nx = grid[nr + v[0]] ? grid[nr + v[0]][nc + v[1]] : null;
+        if (nx && nx.v === t.v && !nx.mergedTurn && (nr !== r || nc !== c || true)) {
+          // 合并
+          grid[r][c] = null;
+          var merged = new Tile(nr + v[0], nc + v[1], t.v * 2);
+          merged.scale = 1; merged.pop = 1; merged.mergedTurn = true;
+          grid[merged.r][merged.c] = merged;
+          t.dead = true; t.r = merged.r; t.c = merged.c;
+          nx.dead = true; nx.r = merged.r; nx.c = merged.c;
+          dying.push(t, nx);
+          tiles.push(merged);
+          gained += merged.v;
+          if (merged.v > maxV) maxV = merged.v;
+          moved = true;
+        } else if (nr !== r || nc !== c) {
+          grid[r][c] = null; t.r = nr; t.c = nc; grid[nr][nc] = t; moved = true;
+        }
+      });
+    });
+
+    if (!moved) { WB.sfx.play('error'); return; }
+
+    score += gained; elScore.textContent = score;
+    if (score > best) { best = score; elBest.textContent = best; localStorage.setItem('wb2048_best', best); }
+    history = snap;
+
+    if (maxV >= 64) WB.sfx.play('merge'); else WB.sfx.play('move');
+    if (gained >= 128) WB.sfx.play('clear');
+
+    if (!won && tiles.some(function (t) { return !t.dead && t.v >= 2048; })) {
+      won = true; WB.sfx.play('win');
+      setTimeout(function () { showOver('你赢了！🎉', '达成 2048 · 当前得分 ' + score, true); }, 420);
+      return;
+    }
+
+    animating = true;
+    setTimeout(function () {
+      spawn();
+      animating = false;
+      if (!canMove()) { WB.sfx.play('lose'); showOver('游戏结束', '没有可移动的方块了 · 得分 ' + score); }
+    }, 130);
+  }
+
+  function canMove() {
+    if (emptyCells().length) return true;
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+      var t = grid[r][c];
+      if (c + 1 < N && grid[r][c + 1] && grid[r][c + 1].v === t.v) return true;
+      if (r + 1 < N && grid[r + 1][c] && grid[r + 1][c].v === t.v) return true;
+    }
+    return false;
+  }
+
+  function showOver(t, p, cont) {
+    overT.textContent = t; overP.textContent = p;
+    document.getElementById('btnAgain').textContent = cont ? '继续挑战' : '再来一局';
+    document.getElementById('btnAgain').dataset.cont = cont ? '1' : '';
+    over.classList.add('show');
+  }
+
+  // ---- 渲染 ----
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var PAD = 10, GAP = 10, CELL = 0, BOARD = 0;
+
+  function resize() {
+    var w = Math.min(cv.parentNode.clientWidth, 420);
+    cv.width = w * DPR; cv.height = w * DPR;
+    cv.style.height = w + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    BOARD = w; PAD = Math.round(w * 0.024); GAP = Math.round(w * 0.024);
+    CELL = (BOARD - PAD * 2 - GAP * (N - 1)) / N;
+    draw();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function px(i) { return PAD + i * (CELL + GAP); }
+
+  function drawTile(t, alpha) {
+    var s = CELL * (t.scale < 1 ? 0.35 + 0.65 * t.scale : 1) * (1 + t.pop * 0.18);
+    var x = px(t.x) + (CELL - s) / 2;
+    var y = px(t.y) + (CELL - s) / 2;
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.fillStyle = tileColor(t.v);
+    roundRect(x, y, s, s, Math.max(4, CELL * 0.09)); ctx.fill();
+    ctx.fillStyle = textColor(t.v);
+    ctx.font = '600 ' + Math.round(fontSize(t.v) * CELL / 82) + 'px -apple-system,"PingFang SC",Helvetica,Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(t.v), x + s / 2, y + s / 2 + 1);
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, BOARD, BOARD);
+    ctx.fillStyle = '#1c2740';
+    roundRect(0, 0, BOARD, BOARD, 14); ctx.fill();
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+      ctx.fillStyle = 'rgba(255,255,255,.045)';
+      roundRect(px(c), px(r), CELL, CELL, Math.max(4, CELL * 0.09)); ctx.fill();
+    }
+    dying.forEach(function (t) { drawTile(t, 0.85); });
+    tiles.forEach(function (t) { if (!t.dead) drawTile(t); });
+  }
+
+  function tick() {
+    var moving = false;
+    var ease = 0.28;
+    tiles.concat(dying).forEach(function (t) {
+      var dx = t.c - t.x, dy = t.r - t.y;
+      if (Math.abs(dx) > 0.002 || Math.abs(dy) > 0.002) { t.x += dx * ease; t.y += dy * ease; moving = true; }
+      else { t.x = t.c; t.y = t.r; }
+      if (t.scale < 1) { t.scale = Math.min(1, t.scale + 0.12); moving = true; }
+      if (t.pop > 0) { t.pop = Math.max(0, t.pop - 0.09); moving = true; }
+    });
+    if (dying.length && dying.every(function (t) { return Math.abs(t.c - t.x) < 0.02 && Math.abs(t.r - t.y) < 0.02; })) {
+      dying.forEach(function (t) { var i = tiles.indexOf(t); if (i >= 0) tiles.splice(i, 1); });
+      dying.length = 0;
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // ---- 输入 ----
+  var sx = 0, sy = 0, tracking = false;
+  cv.addEventListener('touchstart', function (e) {
+    var t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true; WB.sfx.unlock();
+  }, { passive: true });
+  cv.addEventListener('touchmove', function (e) { if (tracking) e.preventDefault(); }, { passive: false });
+  cv.addEventListener('touchend', function (e) {
+    if (!tracking) return; tracking = false;
+    var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+  });
+
+  var mdown = false;
+  cv.addEventListener('mousedown', function (e) { mdown = true; sx = e.clientX; sy = e.clientY; });
+  window.addEventListener('mouseup', function (e) {
+    if (!mdown) return; mdown = false;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+  });
+
+  var KEY = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
+  window.addEventListener('keydown', function (e) {
+    var d = KEY[e.key] || KEY[e.key.toLowerCase && e.key.toLowerCase()];
+    if (d) { e.preventDefault(); move(d); }
+    if (e.key === 'z' && history) { restore(history); history = null; }
+  });
+
+  document.getElementById('btnNew').onclick = function () { WB.sfx.play('start'); reset(); };
+  document.getElementById('btnAgain').onclick = function () {
+    if (this.dataset.cont) { over.classList.remove('show'); WB.sfx.play('start'); }
+    else { WB.sfx.play('start'); reset(); }
+  };
+  document.getElementById('btnUndo').onclick = function () {
+    if (history) { restore(history); history = null; WB.sfx.play('undo'); } else WB.sfx.play('error');
+  };
+  document.getElementById('btnSound').onclick = function () {
+    var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇';
+  };
+
+  window.addEventListener('resize', resize);
+  reset(); resize(); tick();
+})();
+</script>
+</body>
+</html>

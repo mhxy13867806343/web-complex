@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>球球分类 · WorkBuddy H5</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  body { display:flex; flex-direction:column; align-items:center; padding:14px 12px 24px; }
+  .head { width:100%; max-width:460px; display:flex; align-items:flex-end; gap:10px; margin-bottom:12px; }
+  .head h1 { margin:0; font-size:25px;
+    background:linear-gradient(92deg,#4f8cff,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .head .sub { font-size:11.5px; color:var(--txt-1); }
+  .scores { margin-left:auto; display:flex; gap:8px; }
+  .scores .s { min-width:60px; padding:5px 9px; background:var(--bg-1); border:1px solid var(--line);
+    border-radius:9px; text-align:center; }
+  .scores .s b { display:block; font-size:16px; font-variant-numeric:tabular-nums; }
+  .scores .s span { font-size:10.5px; color:var(--txt-1); }
+  .bar { width:100%; max-width:460px; display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .bar .tip { font-size:12px; color:var(--txt-1); flex:1; min-width:120px; }
+  .stage { position:relative; width:100%; max-width:460px; }
+  canvas { width:100%; display:block; touch-action:none; }
+  .over { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(11,15,26,.84); border-radius:14px; backdrop-filter:blur(3px); }
+  .over.show { display:flex; }
+  .over h2 { margin:0; font-size:26px; }
+  .over p { margin:0; color:var(--txt-1); font-size:13px; }
+  select { background:var(--bg-2); color:var(--txt-0); border:1px solid var(--line);
+    border-radius:8px; padding:6px 8px; font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>球球分类</h1>
+    <div class="sub">把同色球归拢到同一根管子</div>
+  </div>
+  <div class="scores">
+    <div class="s"><b id="mv">0</b><span>步数</span></div>
+    <div class="s"><b id="lv">普通</b><span>难度</span></div>
+  </div>
+</div>
+
+<div class="bar">
+  <select id="diff">
+    <option value="6">简单 · 6 色</option>
+    <option value="8" selected>普通 · 8 色</option>
+    <option value="10">困难 · 10 色</option>
+  </select>
+  <button class="btn sm ghost" id="btnUndo">撤销</button>
+  <button class="btn sm ghost" id="btnAdd">加管</button>
+  <button class="btn sm ghost" id="btnNew">重开</button>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+  <span class="tip">点管取球 → 点另一管放入</span>
+</div>
+
+<div class="stage">
+  <canvas id="cv"></canvas>
+  <div class="over" id="over">
+    <h2 id="ot">🎉 全部归位</h2>
+    <p id="overP"></p>
+    <div class="row" style="display:flex;gap:10px">
+      <button class="btn primary" id="btnAgain">再来一局</button>
+      <a class="btn ghost" href="../index.html">返回列表</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var CAP = 4;
+  var PALETTE = ['#ff5f6d','#ffc371','#7ee081','#4fd1ff','#a78bfa','#ff8fd0',
+                 '#facc15','#34d399','#22d3ee','#f97316','#93c5fd','#e879f9'];
+
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var elMv = document.getElementById('mv'), elLv = document.getElementById('lv');
+  var over = document.getElementById('over'), overP = document.getElementById('overP');
+
+  var tubes, colors, moves, undoStack, sel, flying, locked;
+
+  // ---- 关卡生成 ----
+  function build(nColor) {
+    var pool = [];
+    for (var i = 0; i < nColor; i++) for (var k = 0; k < CAP; k++) pool.push(i);
+    // Fisher-Yates 洗牌
+    for (var j = pool.length - 1; j > 0; j--) {
+      var r = Math.floor(Math.random() * (j + 1));
+      var t = pool[j]; pool[j] = pool[r]; pool[r] = t;
+    }
+    tubes = [];
+    for (var c = 0; c < nColor; c++) tubes.push([]);
+    pool.forEach(function (v, idx) { tubes[idx % nColor].push(v); });
+    tubes.push([]); tubes.push([]);       // 两根空管
+    colors = nColor;
+    moves = 0; sel = null; flying = []; locked = false;
+    undoStack = [];
+    elMv.textContent = '0';
+    over.classList.remove('show');
+    layout();
+  }
+
+  function clone() { return tubes.map(function (t) { return t.slice(); }); }
+
+  function isDone() {
+    return tubes.every(function (t) {
+      if (!t.length) return true;
+      if (t.length !== CAP) return false;
+      return t.every(function (v) { return v === t[0]; });
+    });
+  }
+
+  // ---- 布局 ----
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0, tubeW = 0, tubeH = 0, ballD = 0, cols = 0, ROWS = 0;
+
+  function layout() {
+    var w = Math.min(cv.parentNode.clientWidth, 460);
+    var n = tubes.length;
+    cols = n > 6 ? Math.ceil(n / 2) : n;
+    ROWS = n > 6 ? 2 : 1;
+    var gapX = 10, gapY = 16;
+    tubeW = Math.min(62, (w - gapX * (cols + 1)) / cols);
+    ballD = Math.min(tubeW * 0.74, 42);
+    tubeH = ballD * CAP + ballD * 0.55;
+    var rowW = cols * tubeW + (cols - 1) * gapX;
+    var startX = (w - rowW) / 2;
+    var totalH = ROWS * tubeH + (ROWS - 1) * gapY + 12;
+    H = Math.ceil(totalH); W = w;
+    cv.width = w * DPR; cv.height = H * DPR;
+    cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    tubePos = [];
+    for (var i = 0; i < n; i++) {
+      var row = Math.floor(i / cols), col = i % cols;
+      var cnt = Math.min(cols, n - row * cols);
+      var rw = cnt * tubeW + (cnt - 1) * gapX;
+      tubePos.push({
+        x: (w - rw) / 2 + col * (tubeW + gapX),
+        y: 6 + row * (tubeH + gapY),
+        w: tubeW, h: tubeH
+      });
+    }
+    draw();
+  }
+
+  var tubePos = [];
+
+  function ballXY(ti, bi) {           // bi：0 为管底
+    var p = tubePos[ti];
+    var cx = p.x + p.w / 2;
+    var baseY = p.y + p.h - ballD * 0.42;
+    return { x: cx, y: baseY - bi * (ballD * 0.97) };
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawBall(x, y, ci, scale) {
+    var r = ballD / 2 * (scale || 1);
+    var g = ctx.createRadialGradient(x - r * 0.32, y - r * 0.38, r * 0.12, x, y, r * 1.08);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.22, PALETTE[ci]); g.addColorStop(1, shade(PALETTE[ci], -0.32));
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  function shade(hex, amt) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.max(0, Math.min(255, Math.round(r + 255 * amt)));
+    g = Math.max(0, Math.min(255, Math.round(g + 255 * amt)));
+    b = Math.max(0, Math.min(255, Math.round(b + 255 * amt)));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < tubes.length; i++) {
+      var p = tubePos[i];
+      // 管身（U 形：底 + 两侧）
+      var wall = Math.max(3, tubeW * 0.09);
+      ctx.strokeStyle = sel === i ? '#4f8cff' : 'rgba(160,180,215,.42)';
+      ctx.lineWidth = sel === i ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x, p.y + p.h - wall / 2);
+      ctx.arcTo(p.x, p.y + p.h, p.x + wall, p.y + p.h, wall);
+      ctx.lineTo(p.x + p.w - wall, p.y + p.h);
+      ctx.arcTo(p.x + p.w, p.y + p.h, p.x + p.w, p.y + p.h - wall / 2, wall);
+      ctx.lineTo(p.x + p.w, p.y);
+      ctx.stroke();
+      if (sel === i) { ctx.fillStyle = 'rgba(79,140,255,.10)'; roundRect(p.x + wall / 2, p.y + 2, p.w - wall, p.h - 2, wall); ctx.fill(); }
+      // 球
+      for (var b = 0; b < tubes[i].length; b++) {
+        if (skip[i + ':' + b]) continue;
+        var q = ballXY(i, b);
+        var lift = (sel === i && b === tubes[i].length - 1) ? -ballD * 0.34 : 0;
+        drawBall(q.x, q.y + lift, tubes[i][b]);
+      }
+    }
+    flying.forEach(function (f) { drawBall(f.x, f.y, f.ci); });
+  }
+
+  // ---- 交互 ----
+  function hit(mx, my) {
+    for (var i = 0; i < tubePos.length; i++) {
+      var p = tubePos[i];
+      if (mx >= p.x - 6 && mx <= p.x + p.w + 6 && my >= p.y && my <= p.y + p.h + 6) return i;
+    }
+    return -1;
+  }
+
+  function topRun(t) {                 // 顶部连续同色数量
+    if (!t.length) return 0;
+    var v = t[t.length - 1], k = 0;
+    for (var i = t.length - 1; i >= 0 && t[i] === v; i--) k++;
+    return k;
+  }
+
+  function tap(mx, my) {
+    if (locked || flying.length) return;
+    var i = hit(mx, my); if (i < 0) return;
+    WB.sfx.unlock();
+
+    if (sel === null) {
+      if (!tubes[i].length) { WB.sfx.play('error'); return; }
+      sel = i; WB.sfx.play('tap'); draw(); return;
+    }
+    if (sel === i) { sel = null; WB.sfx.play('click'); draw(); return; }
+
+    var src = tubes[sel], dst = tubes[i];
+    var ci = src[src.length - 1];
+    if (dst.length >= CAP) { WB.sfx.play('error'); return; }
+    if (dst.length && dst[dst.length - 1] !== ci) { WB.sfx.play('error'); return; }
+
+    var room = CAP - dst.length;
+    var n = Math.min(topRun(src), room);
+    // 无意义搬运：整管同色搬到空管
+    if (dst.length === 0 && n === src.length && topRun(src) === src.length) { WB.sfx.play('error'); return; }
+
+    undoStack.push({ tubes: clone(), moves: moves });
+    if (undoStack.length > 200) undoStack.shift();
+
+    var from = sel;
+    for (var k = 0; k < n; k++) {
+      var val = src.pop();
+      dst.push(val);
+      // 起点 = 该球在源管中的原索引（pop 后长度即原索引）；终点 = 目标管中刚 push 的位置
+      (function (startIdx, endIdx, val, d) {
+        var a = ballXY(from, startIdx);
+        flying.push({ ci: val, x: a.x, y: a.y, sx: a.x, sy: a.y, tx: 0, ty: 0, delay: d, ti: i, bi: endIdx });
+      })(tubes[from].length, tubes[i].length - 1, val, k * 90);
+    }
+    // 计算落点
+    flying.forEach(function (f) {
+      var q = ballXY(f.ti, f.bi); f.tx = q.x; f.ty = q.y;
+    });
+    sel = null; moves++; elMv.textContent = moves;
+    WB.sfx.play('drop');
+    locked = true;
+    animate();
+  }
+
+  function animate() {
+    var t0 = performance.now();
+    (function frame(now) {
+      var el = now - t0, alive = false;
+      flying.forEach(function (f) {
+        var lt = el - f.delay;
+        if (lt < 0) { alive = true; return; }
+        var pr = Math.min(1, lt / 260);
+        f.x = f.sx + (f.tx - f.sx) * pr;
+        f.y = f.sy + (f.ty - f.sy) * pr - Math.sin(pr * Math.PI) * (ballD * 0.9);
+        if (pr < 1) alive = true;
+      });
+      draw();
+      if (alive) requestAnimationFrame(frame);
+      else {
+        flying.length = 0; locked = false;
+        WB.sfx.play('pop');
+        if (isDone()) {
+          WB.sfx.play('win');
+          overP.textContent = '用了 ' + moves + ' 步完成 ' + colors + ' 色分类';
+          over.classList.add('show');
+        } else if (noMove()) {
+          WB.sfx.play('lose');
+          overP.textContent = '没有可走的步了，试试撤销或加一根管';
+          over.querySelector('h2').textContent = '卡住了';
+          over.classList.add('show');
+        }
+      }
+    })(t0);
+  }
+
+  function noMove() {
+    for (var i = 0; i < tubes.length; i++) for (var j = 0; j < tubes.length; j++) {
+      if (i === j || !tubes[i].length || tubes[j].length >= CAP) continue;
+      if (!tubes[j].length || tubes[j][tubes[j].length - 1] === tubes[i][tubes[i].length - 1]) return false;
+    }
+    return true;
+  }
+
+  cv.addEventListener('click', function (e) {
+    var r = cv.getBoundingClientRect();
+    tap(e.clientX - r.left, e.clientY - r.top);
+  });
+  cv.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+  cv.addEventListener('touchend', function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect(), t = e.changedTouches[0];
+    tap(t.clientX - r.left, t.clientY - r.top);
+  }, { passive: false });
+
+  document.getElementById('btnUndo').onclick = function () {
+    if (locked) return;
+    var s = undoStack.pop();
+    if (!s) { WB.sfx.play('error'); return; }
+    tubes = s.tubes; moves = s.moves; sel = null;
+    elMv.textContent = moves; over.classList.remove('show');
+    WB.sfx.play('undo'); draw();
+  };
+  document.getElementById('btnAdd').onclick = function () {
+    if (locked || tubes.length >= 14) { WB.sfx.play('error'); return; }
+    tubes.push([]); WB.sfx.play('click'); layout();
+  };
+  document.getElementById('btnNew').onclick = function () { WB.sfx.play('start'); build(parseInt(document.getElementById('diff').value, 10)); };
+  document.getElementById('btnAgain').onclick = function () { WB.sfx.play('start'); build(parseInt(document.getElementById('diff').value, 10)); };
+  document.getElementById('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
+  document.getElementById('diff').onchange = function () {
+    elLv.textContent = this.options[this.selectedIndex].text.split(' · ')[0];
+    build(parseInt(this.value, 10));
+  };
+  window.addEventListener('resize', layout);
+
+  build(8);
+})();
+</script>
+</body>
+</html>
