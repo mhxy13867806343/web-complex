@@ -61,13 +61,17 @@ python3 -m http.server 8080
 # 然后访问 http://localhost:8080/main.html
 ```
 
-### 小红书探索页（需要构建）
+### 小红书探索页（需要后端接口）
 
 ```bash
 cd xiaohongshu
 npm install --legacy-peer-deps    # NutUI 的 peer 依赖只声明到 React 18，需要该参数
-npm run dev                       # http://localhost:5173
+npm run dev                       # 终端打印地址（5173 被占会自动顺延，以终端为准）
+# 或本地生产预览：npm run build && npm run start
 ```
+
+> 笔记数据靠运行时 `/api/xhs/*` 接口现抓（匿名访问小红书），**纯静态托管 `dist/` 没有后端会提示「接口不可用」**；
+> 在线预览 / 部署详见 `xiaohongshu/README.md` 的「在线预览与部署」。
 
 桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
 

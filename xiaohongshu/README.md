@@ -53,14 +53,18 @@ GET /api/xhs/feed?channel=推荐   -> { channel, channelId, fetchedAt, count, no
 
 如果部署成**没有 `/api` 的纯静态站点**，页面会明确提示「接口不可用」，而不是回退到假数据。
 
-前端调用见 `src/data/api.ts`（内存缓存 `FEED_TTL=30s`，避免切回同一频道时重复请求）。
+前端调用见 `src/data/api.ts`；接口层对同一次请求有 20s 短缓存（`vite-xhs-data.mjs` 的 `FEED_CACHE_MS`）防连点刷爆对方，
+上拉/下拉刷新带 `fresh=1` 绕过短缓存现抓新一批（小红书推荐流随机，每次都有新内容）。
 
 ## 抓取实现与三个坑
 
 1. **不要用 Node 内置 `fetch`**。小红书 WAF 会做 TLS 指纹识别，`undici` 的请求被 302 到 `/login`，拿不到正文；
    改用 `child_process.execFile('curl', ...)` 就正常返回 200 页面（见 `xhs-client.mjs` 的 `httpGet()`）。
-2. **匿名访问会间歇性被要求登录**。整体是放行的，但短时高频请求后会被风控，全站 302 到登录页，
-   通常过一会儿自行恢复。遇到整片 302 时：① 等一会儿重试；② 或配好登录 Cookie。
+2. **匿名访问会间歇性被要求登录（风控）**。整体是放行的，但短时高频请求后会被风控，全站 302 到登录页，
+   通常过一会儿自行恢复。**已做兜底**（commit `ecf15a6`）：抓取失败自动重试 3 次（隔 1.2s）；
+   每次成功的数据落盘缓存到 `node_modules/.cache/xhs/`（不进 git），风控期间页面**不会白屏**、
+   直接显示上一次的好数据；全失败才提示「临时风控，几分钟后刷新重试即可」。遇到整片 302：等几分钟刷新，
+   或配好登录 Cookie（`npm run login`）。
 3. **「视频」频道 id 有坑**。SSR 给的 `homefeed.video_v3` 无论带不带登录都返回 0 条，
    换成 `homefeed.video` 才有数据。修正表在 `xhs-client.mjs` 的 `CHANNEL_ID_FIX`。
 
@@ -80,8 +84,9 @@ npm run login -- --check # 校验；--show 看脱敏摘要；--clear 删除
 - **频道 chips 单行横向滚动**：补齐桌面端三种操作 —— 按住鼠标拖动（pointer events）、
   滚轮（原生 `wheel` 监听、`passive:false`）、悬停左右翻页箭头；并做两侧渐隐提示。
   选中频道时该 chip 会**自动滚动到可视区中间**。
-- **上拉加载 + 下拉刷新**：上拉用 NutUI `InfiniteLoading`（`target=".page-body"`），
-  先把本地没展示完的翻出来、翻完再从接口续一页；下拉见 `src/hooks/usePullToRefresh.ts`。
+- **上拉加载 + 下拉刷新**：上拉用 NutUI `InfiniteLoading`（注意其 `target` 必须是元素 **id** `target="page-body"`，
+  不能是 CSS 选择器 `.page-body`，否则 `getElementById` 取不到滚动容器、加载永不触发）；
+  先把本地没展示完的翻出来、翻完再从接口续一页（`fresh=1` 现抓）；下拉见 `src/hooks/usePullToRefresh.ts`。
 - **顶栏整体吸顶**：`header + 下拉刷新提示区 + 频道 chips` 包在 `.sticky-top` 里，
   滚多远都能直接切频道。
 - **Toast 自实现**（`src/components/Toast.tsx`）：NutUI 的 `Toast.show` 内部用 React 18 的
@@ -111,7 +116,7 @@ xiaohongshu/
     │   └── app.css            业务模块样式（含 .sticky-top 吸顶、chips、ptr 等）
     ├── data/
     │   ├── index.ts           只有 Note 类型 + PAGE_SIZE（无静态数据）
-    │   └── api.ts             fetchChannels() / fetchFeed() + 30s 内存缓存
+    │   └── api.ts             fetchChannels() / fetchFeed()（上拉/下拉带 fresh=1 现抓）
     ├── hooks/
     │   └── usePullToRefresh.ts  下拉刷新（touch + mouse，阈值 55px）
     └── components/
@@ -142,3 +147,26 @@ xiaohongshu/
   那是 Vite 的模块图/缓存处于半更新状态。**删除 `node_modules/.vite` 后重启 `npm run dev`**、
   再硬刷新浏览器（Cmd+Shift+R）即可，源码本身没有问题。
 - 本仓库的 `xiaohongshu/` 不含任何图片/字体素材，封面与头像全部来自线上 CDN。
+
+## 在线预览与部署
+
+本项目是「前端 + Node 接口」一体：笔记数据靠运行时的 `/api/xhs/*`（由 `scripts/server.mjs` 或 dev 中间件提供），
+所以**纯静态托管（只传 `dist/`）会没有后端 → 页面提示「接口不可用」**。
+
+- **本地开发预览**：`npm run dev` → 终端打印 `http://localhost:5173/`（5173 被占用会**自动顺延端口**，以终端地址为准）。
+  桌面浏览器会渲染成居中「手机」；手机/窄屏铺满。⚠️ 启动命令保持干净，不要在 `npm run dev` 后追加 `#` 注释，
+  否则 Vite 会把 `#` 当成路径参数导致页面打不开。
+- **本地生产预览**：`npm run build && npm run start` → `http://localhost:5173/`（用 `PORT=xxxx npm run start` 改端口）。
+- **GitHub 预览 / 对外在线预览**：把 `npm run start`（Node 服务，已含 `dist/` 托管 + `/api/xhs`）作为 HTTP 服务发布即可
+  （如 WorkBuddy「发布为应用」、或容器 / 云函数跑 `npm run start`），再把链接贴到 GitHub 仓库 README 顶部即为「GitHub 上的预览」。
+  ⚠️ **GitHub Pages 是纯静态托管、跑不了 Node 后端**，直接挂 `dist/` 会显示「接口不可用」，不适合做本项目的在线预览；
+  想要能真实加载笔记的在线预览，必须用能跑 Node 的方式（见上）。
+- 在线预览同样受小红书匿名风控影响：偶发 302 时页面显示缓存数据 / 提示刷新，几分钟后自恢复。
+
+## 已知限制（待处理）
+
+- **评论数不展示**：匿名 feed 的 `interactInfo` 只有 `liked` / `likedCount`，没有评论数字段（需登录态接口），按需求暂不显示。
+- **点赞 / 分享已移除**：按需求，卡片与详情页都不展示点赞数、不提供分享入口，详情页仅保留「收藏」。
+- **风控间歇性 302**：匿名访问偶发被拦，已用「重试 + 内存/磁盘缓存」兜底，不会白屏；彻底解决需配登录 Cookie。
+- **仅做「发现」页**：关注 / 附近 / 搜索 / 笔记正文 / 商品 / 私信等均需登录态，未做（摆假数据不如不做）。
+- **视频频道**：`homefeed.video` 才有数据（`homefeed.video_v3` 恒返回 0 条），已在 `xhs-client.mjs` 的 `CHANNEL_ID_FIX` 修正。
