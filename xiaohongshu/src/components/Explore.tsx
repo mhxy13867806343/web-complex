@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
-import { InfiniteLoading, SearchBar, Tabs, Toast, Empty } from '@nutui/nutui-react'
-import { Photograph } from '@nutui/icons-react'
-import { CHANNELS, NOTES, TOPICS, type Note } from '../mock/notes'
+import { Empty, InfiniteLoading, SearchBar, Tabs, Toast } from '@nutui/nutui-react'
+import { Photograph, Tips } from '@nutui/icons-react'
+import { CHANNELS, FETCHED_AT, NOTES, PAGE_SIZE, type Note } from '../data'
 import NoteDetail from './NoteDetail'
 import Waterfall from './Waterfall'
 
-/** 关注页只展示这些作者的笔记 */
-const FOLLOWED = new Set(['林小满', 'Yuki', '在路上的猫'])
-const MAX_ROUND = 3
+/** 未登录时不可用的页签 */
+const LOGIN_REQUIRED_TABS = new Set(['follow', 'nearby'])
+
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '未知时间'
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
 
 export default function Explore() {
   const [tab, setTab] = useState<string>('discover')
@@ -15,24 +21,17 @@ export default function Explore() {
   const [liked, setLiked] = useState<Record<string, boolean>>({})
   const [collected, setCollected] = useState<Record<string, boolean>>({})
   const [openNote, setOpenNote] = useState<Note | null>(null)
-  const [round, setRound] = useState(1)
+  const [visible, setVisible] = useState(PAGE_SIZE)
 
-  // 依据顶部主 tab 过滤数据源
-  const base = useMemo(() => {
-    if (tab === 'follow') return NOTES.filter((n) => FOLLOWED.has(n.author.name))
-    if (tab === 'nearby') return NOTES.filter((n) => !!n.location)
-    return NOTES
-  }, [tab])
+  /** 频道切换需要登录态，匿名抓取只能拿到「推荐」流 */
+  const channelLocked = channel !== '推荐'
 
-  // 再按细分频道过滤；「加载更多」时把当前列表复制追加一轮
   const list = useMemo(() => {
-    const src = channel === '推荐' ? base : base.filter((n) => n.channel === channel)
-    const out: Note[] = []
-    for (let i = 0; i < round; i++) {
-      src.forEach((n) => out.push(i === 0 ? n : { ...n, id: `${n.id}-r${i}` }))
-    }
-    return out
-  }, [base, channel, round])
+    if (LOGIN_REQUIRED_TABS.has(tab) || channelLocked) return []
+    return NOTES.slice(0, visible)
+  }, [tab, channelLocked, visible])
+
+  const hasMore = !LOGIN_REQUIRED_TABS.has(tab) && !channelLocked && visible < NOTES.length
 
   const toggleLike = (note: Note) => {
     setLiked((prev) => ({ ...prev, [note.id]: !prev[note.id] }))
@@ -47,13 +46,34 @@ export default function Explore() {
   const loadMore = () =>
     new Promise<void>((resolve) => {
       setTimeout(() => {
-        setRound((r) => r + 1)
+        setVisible((v) => v + PAGE_SIZE)
         resolve()
-      }, 600)
+      }, 500)
     })
+
+  const loginHint = (
+    <div className="login-hint">
+      <Tips width={26} height={26} color="#c8c8c8" />
+      <b>{LOGIN_REQUIRED_TABS.has(tab) ? '该页签需要登录' : `「${channel}」频道需要登录`}</b>
+      <p>
+        {LOGIN_REQUIRED_TABS.has(tab)
+          ? '小红书「关注」与「附近」依赖账号登录态与定位权限，匿名访问拿不到数据，这里如实留空。'
+          : '小红书频道页（?channel_id=...）会对匿名请求 302 到登录页，所以频道内容抓不到。'}
+      </p>
+      <span className="login-hint-tip">
+        若要看真实频道内容，可带登录 Cookie 重新抓取：
+        <code>XHS_COOKIE=&quot;...&quot; npm run fetch:notes</code>
+      </span>
+    </div>
+  )
 
   const content = (
     <>
+      <div className="data-banner">
+        <span className="dot" />
+        共 {NOTES.length} 条真实笔记 · 抓取自 xiaohongshu.com/explore · {formatTime(FETCHED_AT)}
+      </div>
+
       <div className="chips">
         {CHANNELS.map((c) => (
           <span
@@ -61,7 +81,7 @@ export default function Explore() {
             className={`chip${channel === c ? ' active' : ''}`}
             onClick={() => {
               setChannel(c)
-              setRound(1)
+              setVisible(PAGE_SIZE)
             }}
           >
             {c}
@@ -69,34 +89,22 @@ export default function Explore() {
         ))}
       </div>
 
-      {channel === '推荐' && (
-        <div className="topics">
-          {TOPICS.map((t) => (
-            <div className="topic" key={t.id}>
-              <span className="topic-emoji">{t.emoji}</span>
-              <div>
-                <div className="topic-name">{t.name}</div>
-                <div className="topic-hot">{t.hot}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {list.length === 0 ? (
+      {LOGIN_REQUIRED_TABS.has(tab) || channelLocked ? (
+        loginHint
+      ) : list.length === 0 ? (
         <div className="empty-box">
-          <Empty description="这个频道还没有内容" />
+          <Empty description="没有内容" />
         </div>
       ) : (
         <Waterfall notes={list} liked={liked} onLike={toggleLike} onOpen={setOpenNote} />
       )}
 
       <InfiniteLoading
-        hasMore={round < MAX_ROUND && list.length > 0}
+        hasMore={hasMore}
         threshold={120}
         target=".page-body"
         loadingText="正在加载…"
-        loadMoreText="没有更多内容了"
+        loadMoreText="已经到底了"
         onLoadMore={loadMore}
       />
     </>
@@ -123,7 +131,7 @@ export default function Explore() {
         autoHeight
         onChange={(v) => {
           setTab(String(v))
-          setRound(1)
+          setVisible(PAGE_SIZE)
         }}
       >
         <Tabs.TabPane title="关注" value="follow">

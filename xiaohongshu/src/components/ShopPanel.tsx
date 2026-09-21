@@ -12,8 +12,8 @@ import {
   type CascaderOption,
 } from '@nutui/nutui-react'
 import { ArrowDown, Clock, Coupon, Location } from '@nutui/icons-react'
-import { COUPONS, GOODS_LIST, type Goods } from '../mock/notes'
-import { REGION, SHOP_CATEGORIES } from '../mock/region'
+import { COUPONS, GOODS_LIST, SHOP_CATEGORIES, type Goods } from '../data/demo-shop'
+import { REGION } from '../data/region'
 
 /** 秒杀结束时间：进入页面后 3 小时 */
 const END_TIME = Date.now() + 3 * 3600 * 1000
@@ -50,6 +50,12 @@ export default function ShopPanel() {
 
   return (
     <div>
+      {/* 数据来源说明：真实商品数据需要登录，这里只演示组件能力 */}
+      <div className="demo-banner">
+        <b>演示数据</b>
+        <span>本页用于展示 NutUI 电商组件（地址 / 倒计时 / 券 / 规格选择），商品为示意数据</span>
+      </div>
+
       {/* ---------- 顶部：地址 + 搜索 ---------- */}
       <div className="shop-header">
         <div className="shop-addr" onClick={() => setAddrVisible(true)}>

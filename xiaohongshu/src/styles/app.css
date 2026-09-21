@@ -2,6 +2,87 @@
  * 业务模块样式
  * ============================================================ */
 
+/* ---------------- 数据来源提示 ---------------- */
+.data-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  color: #8a8a8a;
+  background: #fafafa;
+  border-bottom: 1px solid var(--xhs-line);
+}
+
+.data-banner .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34c759;
+  flex-shrink: 0;
+}
+
+.demo-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #a06a00;
+  background: #fff8e6;
+  border-bottom: 1px solid #ffe9b8;
+}
+
+.demo-banner b {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: #fff;
+  background: #f0a30a;
+  border-radius: 4px;
+}
+
+/* ---------------- 需登录占位 ---------------- */
+.login-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 54px 28px 64px;
+  text-align: center;
+}
+
+.login-hint b {
+  font-size: 14px;
+  color: #666;
+}
+
+.login-hint p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #9b9b9b;
+}
+
+.login-hint-tip {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: #b3b3b3;
+}
+
+.login-hint-tip code {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #13386c;
+  background: #eef3fb;
+  border-radius: 5px;
+  word-break: break-all;
+}
+
 /* ---------------- 顶部栏 ---------------- */
 .xhs-header {
   position: sticky;
@@ -180,11 +261,53 @@
 
 .note-cover {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
   overflow: hidden;
+  background: #f0f0f0;
+}
+
+.note-cover-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.note-cover-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  background: linear-gradient(135deg, #f7f7f7, #ececec);
+}
+
+.note-cover-fallback span {
+  font-size: 34px;
+}
+
+.note-cover-fallback em {
+  font-size: 11px;
+  font-style: normal;
+  color: #b3b3b3;
+}
+
+/* 真实头像 */
+.avatar-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.avatar-img-lg {
+  width: 38px;
+  height: 38px;
 }
 
 .note-cover-emoji {
@@ -305,12 +428,59 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 300px;
+  background: #f0f0f0;
 }
 
-.detail-cover-emoji {
-  font-size: 96px;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+.detail-cover-img {
+  display: block;
+  width: 100%;
+  max-height: 460px;
+  object-fit: contain;
+  background: #111;
+}
+
+.detail-cover-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 80px 0;
+}
+
+.detail-cover-fallback span {
+  font-size: 60px;
+}
+
+.detail-cover-fallback em {
+  font-size: 12px;
+  font-style: normal;
+  color: #b3b3b3;
+}
+
+/* 正文需登录的说明块 */
+.detail-locked {
+  padding: 12px 14px;
+  background: #fafafa;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.detail-locked p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #8a8a8a;
+}
+
+.btn-open {
+  display: inline-block;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--xhs-red);
+  border-radius: 15px;
+  text-decoration: none;
 }
 
 .detail-body {
@@ -844,6 +1014,25 @@
   font-size: 30px;
   border-radius: 50%;
   box-shadow: 0 4px 12px rgba(255, 36, 66, 0.2);
+}
+
+.me-avatar-guest {
+  font-size: 26px;
+  color: #b3b3b3;
+  background: #f0f0f0;
+  box-shadow: none;
+}
+
+.btn-login {
+  flex-shrink: 0;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--xhs-red);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
 }
 
 .me-name {

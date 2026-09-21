@@ -17,6 +17,11 @@ export default function MessagePanel() {
         <Service width={20} height={20} />
       </div>
 
+      <div className="demo-banner" style={{ margin: '0 12px 8px' }}>
+        <b>演示数据</b>
+        <span>未登录状态拿不到真实私信与通知，这里仅演示消息列表的排版</span>
+      </div>
+
       {CHATS.map((c) => (
         <div
           className="msg-item"

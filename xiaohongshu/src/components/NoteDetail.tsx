@@ -1,12 +1,7 @@
+import { useState } from 'react'
 import { Popup, Toast } from '@nutui/nutui-react'
-import { ArrowLeft, Comment, Heart, HeartFill, Share, Star, StarFill } from '@nutui/icons-react'
-import type { Note } from '../mock/notes'
-
-const FAKE_COMMENTS = [
-  { name: '阿橘', emoji: '🍊', bg: '#ffe0b0', text: '太实用了！已经收藏，周末就去试～' },
-  { name: '小鹿不迷路', emoji: '🦌', bg: '#c8e6d0', text: '求个链接，找了好久同款！' },
-  { name: '拿铁不加冰', emoji: '☕️', bg: '#e8d8f0', text: '第三点说到我心里去了，感谢分享' },
-]
+import { ArrowLeft, Heart, HeartFill, Share, Star, StarFill } from '@nutui/icons-react'
+import type { Note } from '../data'
 
 interface Props {
   note: Note | null
@@ -17,7 +12,11 @@ interface Props {
   onClose: () => void
 }
 
-/** 笔记详情：底部弹出式全屏页 */
+/**
+ * 笔记详情
+ * 封面 / 标题 / 作者 / 点赞数均为真实数据；
+ * 正文与评论需要登录态才能抓到，这里如实提示并给出原站链接。
+ */
 export default function NoteDetail({
   note,
   liked,
@@ -26,6 +25,9 @@ export default function NoteDetail({
   onCollect,
   onClose,
 }: Props) {
+  const [coverBroken, setCoverBroken] = useState(false)
+  const [avatarBroken, setAvatarBroken] = useState(false)
+
   return (
     <Popup
       visible={!!note}
@@ -40,46 +42,61 @@ export default function NoteDetail({
       {note && (
         <div className="detail">
           <div className="detail-scroll">
-            <div
-              className="detail-cover"
-              style={{
-                background: `linear-gradient(135deg, ${note.cover[0]}, ${note.cover[1]})`,
-              }}
-            >
-              <span className="detail-cover-emoji">{note.emoji}</span>
+            <div className="detail-cover">
+              {coverBroken ? (
+                <div className="detail-cover-fallback">
+                  <span>🍠</span>
+                  <em>封面加载失败</em>
+                </div>
+              ) : (
+                <img
+                  className="detail-cover-img"
+                  src={note.cover}
+                  alt={note.title}
+                  referrerPolicy="no-referrer"
+                  onError={() => setCoverBroken(true)}
+                />
+              )}
             </div>
 
             <div className="detail-body">
               <h2 className="detail-title">{note.title}</h2>
-              <p className="detail-desc">{note.desc}</p>
+
               <div className="detail-tags">
-                <span className="detail-tag">#{note.channel}</span>
-                <span className="detail-tag">#生活记录</span>
-                {note.location && <span className="detail-tag">#{note.location}</span>}
+                <span className="detail-tag">{note.type === 'video' ? '视频笔记' : '图文笔记'}</span>
+                <span className="detail-tag">❤️ {note.likes} 赞</span>
+              </div>
+
+              <div className="detail-locked">
+                <p>正文、话题标签与评论需要登录小红书账号后才能获取，这里不做伪造。</p>
+                <a
+                  className="btn-open"
+                  href={note.noteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => Toast.show({ content: '在原站打开该笔记', duration: 1.2 })}
+                >
+                  在小红书打开原笔记
+                </a>
               </div>
             </div>
 
             <div className="detail-author">
-              <span className="avatar-emoji" style={{ background: note.author.bg }}>
-                {note.author.emoji}
-              </span>
+              {avatarBroken || !note.author.avatar ? (
+                <span className="avatar-emoji" style={{ background: '#f0f0f0' }}>
+                  {note.author.name.slice(0, 1)}
+                </span>
+              ) : (
+                <img
+                  className="avatar-img avatar-img-lg"
+                  src={note.author.avatar}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setAvatarBroken(true)}
+                />
+              )}
               <span className="detail-author-name">{note.author.name}</span>
               <button className="btn-follow">关注</button>
-            </div>
-
-            <div className="detail-comments">
-              <h4>共 {note.comments} 条评论</h4>
-              {FAKE_COMMENTS.map((c) => (
-                <div className="comment" key={c.name}>
-                  <span className="avatar-emoji" style={{ background: c.bg }}>
-                    {c.emoji}
-                  </span>
-                  <div className="comment-main">
-                    <div className="comment-name">{c.name}</div>
-                    <div className="comment-text">{c.text}</div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -90,25 +107,18 @@ export default function NoteDetail({
               onClick={() => onLike(note)}
             >
               {liked ? <HeartFill width={19} height={19} /> : <Heart width={19} height={19} />}
-              {note.likes + (liked ? 1 : 0)}
+              {note.likes}
             </span>
             <span
               className={`detail-action${collected ? ' on' : ''}`}
               onClick={() => onCollect(note)}
             >
               {collected ? <StarFill width={19} height={19} /> : <Star width={19} height={19} />}
-              {note.likes > 2000 ? '1.2k' : '收藏'}
+              收藏
             </span>
             <span
               className="detail-action"
-              onClick={() => Toast.show({ content: '已复制链接（演示）', duration: 1.2 })}
-            >
-              <Comment width={19} height={19} />
-              {note.comments}
-            </span>
-            <span
-              className="detail-action"
-              onClick={() => Toast.show({ content: '分享面板（演示）', duration: 1.2 })}
+              onClick={() => Toast.show({ content: '已复制原站链接', duration: 1.2 })}
             >
               <Share width={19} height={19} />
             </span>

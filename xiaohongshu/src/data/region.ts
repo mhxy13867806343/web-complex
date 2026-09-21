@@ -1,7 +1,7 @@
 import type { CascaderOption } from '@nutui/nutui-react'
 
 /**
- * 精简版省市区数据（用于 NutUI Address 组件演示）
+ * 省市区数据（用于 NutUI Address 组件演示）
  * 结构遵循 CascaderOption：{ value, text, children }
  */
 export const REGION: CascaderOption[] = [
@@ -97,13 +97,4 @@ export const REGION: CascaderOption[] = [
       },
     ],
   },
-]
-
-/** 购物页左侧分类 */
-export const SHOP_CATEGORIES = [
-  { title: '今日推荐', value: 0 },
-  { title: '服饰穿搭', value: 1 },
-  { title: '美妆个护', value: 2 },
-  { title: '数码家电', value: 3 },
-  { title: '家居生活', value: 4 },
 ]

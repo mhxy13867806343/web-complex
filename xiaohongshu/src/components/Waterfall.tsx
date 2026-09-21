@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Note } from '../mock/notes'
+import type { Note } from '../data'
 import NoteCard from './NoteCard'
 
 interface Props {
@@ -11,7 +11,8 @@ interface Props {
 
 /**
  * 双列瀑布流
- * 按「累计高度最小优先」把笔记分配进两列，视觉上错落且两列高度接近。
+ * 用每条笔记真实的 coverWidth / coverHeight 估算列高，
+ * 按「累计高度最小优先」分列，视觉错落且两列高度接近。
  */
 export default function Waterfall({ notes, liked, onLike, onOpen }: Props) {
   const columns = useMemo(() => {
@@ -20,8 +21,9 @@ export default function Waterfall({ notes, liked, onLike, onOpen }: Props) {
     notes.forEach((note) => {
       const target = heights[0] <= heights[1] ? 0 : 1
       cols[target].push(note)
-      // 封面高度按 ratio 估算，文字区按固定 0.35 计
-      heights[target] += note.ratio + 0.35
+      const ratio = note.coverWidth > 0 ? note.coverHeight / note.coverWidth : 1.33
+      // 封面高度 + 文字区固定高度（约 0.35 个列宽）
+      heights[target] += ratio + 0.35
     })
     return cols
   }, [notes])
