@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Popup } from '@nutui/nutui-react'
-import { ArrowLeft, Heart, HeartFill, Share, Star, StarFill } from '@nutui/icons-react'
+import { ArrowLeft, Star, StarFill } from '@nutui/icons-react'
 import type { Note } from '../data'
 import { Toast } from './Toast'
 
 interface Props {
   note: Note | null
-  liked: boolean
   collected: boolean
-  onLike: (note: Note) => void
   onCollect: (note: Note) => void
   onClose: () => void
 }
@@ -18,14 +16,7 @@ interface Props {
  * 封面 / 标题 / 作者 / 点赞数均为真实数据；
  * 正文与评论需要登录态才能抓到，这里如实提示并给出原站链接。
  */
-export default function NoteDetail({
-  note,
-  liked,
-  collected,
-  onLike,
-  onCollect,
-  onClose,
-}: Props) {
+export default function NoteDetail({ note, collected, onCollect, onClose }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
 
@@ -65,7 +56,6 @@ export default function NoteDetail({
 
               <div className="detail-tags">
                 <span className="detail-tag">{note.type === 'video' ? '视频笔记' : '图文笔记'}</span>
-                <span className="detail-tag">❤️ {note.likes} 赞</span>
               </div>
 
               <div className="detail-locked">
@@ -103,25 +93,13 @@ export default function NoteDetail({
 
           <div className="detail-bar">
             <span className="detail-input">说点什么…</span>
-            <span
-              className={`detail-action${liked ? ' on' : ''}`}
-              onClick={() => onLike(note)}
-            >
-              {liked ? <HeartFill width={19} height={19} /> : <Heart width={19} height={19} />}
-              {note.likes}
-            </span>
+            {/* 点赞数、分享入口均已移除，只剩收藏 */}
             <span
               className={`detail-action${collected ? ' on' : ''}`}
               onClick={() => onCollect(note)}
             >
               {collected ? <StarFill width={19} height={19} /> : <Star width={19} height={19} />}
               收藏
-            </span>
-            <span
-              className="detail-action"
-              onClick={() => Toast.show({ content: '已复制原站链接', duration: 1.2 })}
-            >
-              <Share width={19} height={19} />
             </span>
           </div>
         </div>

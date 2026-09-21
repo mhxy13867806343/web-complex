@@ -1,18 +1,18 @@
 import { useState } from 'react'
-import { Heart, HeartFill, Play } from '@nutui/icons-react'
+import { Play } from '@nutui/icons-react'
 import type { Note } from '../data'
 
 interface Props {
   note: Note
-  liked: boolean
-  onLike: (note: Note) => void
   onOpen: (note: Note) => void
 }
 
-/** 笔记卡片：封面、点赞数、作者均来自真实抓取数据 */
-export default function NoteCard({ note, liked, onLike, onOpen }: Props) {
+/**
+ * 笔记卡片：只保留封面 + 标题。
+ * 底部的作者 / 点赞数那一行已按要求整体移除（不做点击、不展示计数）。
+ */
+export default function NoteCard({ note, onOpen }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
-  const [avatarBroken, setAvatarBroken] = useState(false)
 
   return (
     <div className="note-card" onClick={() => onOpen(note)}>
@@ -45,35 +45,6 @@ export default function NoteCard({ note, liked, onLike, onOpen }: Props) {
 
       <div className="note-body">
         <div className="note-title ellipsis-2">{note.title}</div>
-        <div className="note-meta">
-          <span className="note-author">
-            {avatarBroken || !note.author.avatar ? (
-              <span className="avatar-emoji" style={{ background: '#f0f0f0' }}>
-                {note.author.name.slice(0, 1)}
-              </span>
-            ) : (
-              <img
-                className="avatar-img"
-                src={note.author.avatar}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={() => setAvatarBroken(true)}
-              />
-            )}
-            <span className="note-author-name">{note.author.name}</span>
-          </span>
-          <span
-            className={`note-like${liked ? ' on' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onLike(note)
-            }}
-          >
-            {liked ? <HeartFill width={13} height={13} /> : <Heart width={13} height={13} />}
-            {note.likes}
-          </span>
-        </div>
       </div>
     </div>
   )

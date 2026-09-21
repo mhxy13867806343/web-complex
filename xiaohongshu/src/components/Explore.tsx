@@ -38,7 +38,6 @@ export default function Explore() {
   const [loading, setLoading] = useState(false)
   /** 接口不可用（纯静态部署 / 被风控）时不再反复重试 */
   const [dead, setDead] = useState<Record<string, boolean>>({})
-  const [liked, setLiked] = useState<Record<string, boolean>>({})
   const [collected, setCollected] = useState<Record<string, boolean>>({})
   const [openNote, setOpenNote] = useState<Note | null>(null)
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -155,10 +154,6 @@ export default function Explore() {
       })
     })
 
-  const toggleLike = (note: Note) => {
-    setLiked((prev) => ({ ...prev, [note.id]: !prev[note.id] }))
-  }
-
   const toggleCollect = (note: Note) => {
     const next = !collected[note.id]
     setCollected((prev) => ({ ...prev, [note.id]: next }))
@@ -224,7 +219,7 @@ export default function Explore() {
           <Empty description="这个频道暂时拿不到数据，点右上角刷新试试" />
         </div>
       ) : (
-        <Waterfall notes={list} liked={liked} onLike={toggleLike} onOpen={setOpenNote} />
+        <Waterfall notes={list} onOpen={setOpenNote} />
       )}
 
       <InfiniteLoading
@@ -238,9 +233,7 @@ export default function Explore() {
 
       <NoteDetail
         note={openNote}
-        liked={openNote ? !!liked[openNote.id] : false}
         collected={openNote ? !!collected[openNote.id] : false}
-        onLike={toggleLike}
         onCollect={toggleCollect}
         onClose={() => setOpenNote(null)}
       />
