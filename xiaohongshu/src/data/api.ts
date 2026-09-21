@@ -23,10 +23,6 @@ export interface ChannelItem {
   id: string
 }
 
-/** 内存缓存，避免切回去时重复请求同一个流 */
-const feedCache = new Map<string, { at: number; data: FeedResult }>()
-const FEED_TTL = 30 * 1000
-
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(path, { signal, headers: { Accept: 'application/json' } })
   if (!res.ok) {
@@ -47,13 +43,17 @@ export function fetchChannels(signal?: AbortSignal) {
   return get<{ fetchedAt: string; channels: ChannelItem[] }>('/api/xhs/channels', signal)
 }
 
-/** 实时拉取某个流的笔记 */
-export async function fetchFeed(channel: string, signal?: AbortSignal, useCache = false) {
-  if (useCache) {
-    const hit = feedCache.get(channel)
-    if (hit && Date.now() - hit.at < FEED_TTL) return { ...hit.data, cached: true }
-  }
-  const data = await get<FeedResult>(`/api/xhs/feed?channel=${encodeURIComponent(channel)}`, signal)
-  feedCache.set(channel, { at: Date.now(), data })
-  return data
+/**
+ * 实时拉取某个流的笔记。
+ * @param opts.more 为 true 时追加 `fresh=1`，告知服务端绕过短缓存、
+ *                  现抓「新一批」笔记（小红书推荐流是随机的，每次都能拿到新内容）。
+ *                  不传或 false 时，服务端会用短缓存，适合首屏/下拉刷新。
+ */
+export async function fetchFeed(
+  channel: string,
+  opts: { signal?: AbortSignal; more?: boolean } = {}
+) {
+  const qs = new URLSearchParams({ channel })
+  if (opts.more) qs.set('fresh', '1')
+  return get<FeedResult>(`/api/xhs/feed?${qs.toString()}`, opts.signal)
 }

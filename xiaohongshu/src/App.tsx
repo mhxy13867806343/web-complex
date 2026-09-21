@@ -9,7 +9,9 @@ import { ToastHost } from './components/Toast'
 export default function App() {
   return (
     <div className="phone">
-      <div className="page-body">
+      {/* 注意：这个 id 是必需的 —— NutUI 的 InfiniteLoading 用 document.getElementById(target) 找滚动容器，
+          传类名选择器（'.page-body'）会找不到，它会静默回退到 window，导致上拉加载永远不触发。 */}
+      <div className="page-body" id="page-body">
         <Explore />
       </div>
       <ToastHost />

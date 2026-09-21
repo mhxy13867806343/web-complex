@@ -64,10 +64,14 @@ function send(res, code, data) {
   res.end(body)
 }
 
-/** 抓一个流（推荐 or 频道） */
-async function fetchFeed(channel) {
-  const hit = feedCache.get(channel)
-  if (hit && Date.now() - hit.at < FEED_CACHE_MS) return { ...hit.data, cached: true }
+/** 抓一个流（推荐 or 频道）。
+ * @param fresh 为 true 时绕过短缓存、现抓一批新笔记（上拉加载用）。
+ *              小红书推荐流是随机的，所以 fresh 每次都能拿到和上次不一样的内容。 */
+async function fetchFeed(channel, fresh = false) {
+  if (!fresh) {
+    const hit = feedCache.get(channel)
+    if (hit && Date.now() - hit.at < FEED_CACHE_MS) return { ...hit.data, cached: true }
+  }
 
   let url = EXPLORE_URL
   let channelId = 'homefeed_recommend'
@@ -114,7 +118,8 @@ export function buildXhsHandler() {
     try {
       if (u.pathname === '/feed') {
         const channel = u.searchParams.get('channel') || '推荐'
-        const data = await fetchFeed(channel)
+        const fresh = u.searchParams.get('fresh') === '1'
+        const data = await fetchFeed(channel, fresh)
         return send(res, 200, data)
       }
       if (u.pathname === '/channels') {

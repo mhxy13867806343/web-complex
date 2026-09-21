@@ -10,7 +10,10 @@ import { Toast } from './Toast'
 import Waterfall from './Waterfall'
 
 const RECOMMEND = '推荐'
-const SCROLLER = '.page-body'
+/** 给 document.querySelector 用（带 #），下拉刷新 / 切频道滚顶都靠它 */
+const SCROLLER = '#page-body'
+/** 给 NutUI InfiniteLoading 的 target 用 —— 组件内部是 document.getElementById(target)，所以这里只能传 id（不带 #） */
+const SCROLLER_ID = 'page-body'
 
 /** 单个流最多累积多少条 */
 const CAP = 300
@@ -40,11 +43,15 @@ export default function Explore() {
   const [openNote, setOpenNote] = useState<Note | null>(null)
   const [visible, setVisible] = useState(PAGE_SIZE)
   const abortRef = useRef<AbortController | null>(null)
+  /** 每个流已经「到底」的标记：上拉加载某次返回 0 条新内容就封顶 */
+  const [bottom, setBottom] = useState<Record<string, boolean>>({})
+  /** feeds 的镜像 ref，load 里用来算「这次新增了 N 条」（避免闭包拿到旧 state） */
+  const feedsRef = useRef<Record<string, Note[]>>({})
 
   const activeNotes: Note[] = feeds[channel] || []
   const list = activeNotes.slice(0, visible)
   const hasMoreLocal = visible < activeNotes.length
-  const hasMore = hasMoreLocal || !dead[channel]
+  const hasMore = hasMoreLocal || (!dead[channel] && !bottom[channel])
 
   /**
    * 抓一次数据。
@@ -58,22 +65,33 @@ export default function Explore() {
       abortRef.current = ac
       setLoading(true)
       try {
-        const r = await fetchFeed(ch, ac.signal)
+        const r = await fetchFeed(ch, { signal: ac.signal, more: mode === 'more' })
         if (r.notes.length) {
-          setFeeds((prev) => {
-            const cur = prev[ch] || []
-            const next = mode === 'more' ? mergeNotes(cur, r.notes) : mergeNotes(r.notes, cur)
-            return { ...prev, [ch]: next.slice(0, CAP) }
-          })
+          const cur = feedsRef.current[ch] || []
+          const next = mode === 'more' ? mergeNotes(cur, r.notes) : mergeNotes(r.notes, cur)
+          const added = next.length - cur.length
+          feedsRef.current[ch] = next.slice(0, CAP)
+          setFeeds((prev) => ({ ...prev, [ch]: next.slice(0, CAP) }))
+          // 重新有数据了，撤销「到底」标记
+          setBottom((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
+          setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
+          if (added > 0) {
+            if (!silent) {
+              Toast.show({
+                content: mode === 'more' ? `又加载了 ${added} 条` : `已刷新 ${added} 条`,
+                duration: 1.5,
+              })
+            }
+            return added
+          }
+          // 抓到了但全是重复的（极少见）→ 当作到底
+          if (mode === 'more') setBottom((prev) => ({ ...prev, [ch]: true }))
+          if (!silent) Toast.show({ content: '暂时没有更多了', duration: 1.5 })
+          return 0
         }
         setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
-        if (!silent) {
-          Toast.show({
-            content: mode === 'more' ? `又加载了 ${r.notes.length} 条` : `已刷新 ${r.notes.length} 条`,
-            duration: 1.5,
-          })
-        }
-        return r.notes.length
+        if (!silent) Toast.show({ content: '暂时没有更多了', duration: 1.5 })
+        return 0
       } catch (e) {
         if ((e as Error).name === 'AbortError') return 0
         setDead((prev) => ({ ...prev, [ch]: true }))
@@ -126,12 +144,13 @@ export default function Explore() {
         }, 400)
         return
       }
-      if (dead[channel] || loading) {
+      if (dead[channel] || loading || bottom[channel]) {
         resolve()
         return
       }
-      void load(channel, true, 'more').then(() => {
-        setVisible((v) => v + PAGE_SIZE)
+      void load(channel, true, 'more').then((n) => {
+        // 只有真的多出来新笔记才把可见条数往下推一页；否则（已到底）就停在「已经到底了」
+        if (n > 0) setVisible((v) => v + PAGE_SIZE)
         resolve()
       })
     })
@@ -211,7 +230,7 @@ export default function Explore() {
       <InfiniteLoading
         hasMore={hasMore}
         threshold={120}
-        target={SCROLLER}
+        target={SCROLLER_ID}
         loadingText="正在加载…"
         loadMoreText="已经到底了"
         onLoadMore={loadMore}
