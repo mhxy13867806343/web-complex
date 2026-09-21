@@ -108,6 +108,9 @@ function send(res, code, data) {
   res.statusCode = code
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept')
   res.end(body)
 }
 
@@ -175,6 +178,13 @@ async function fetchFeed(channel, fresh = false) {
  */
 export function buildXhsHandler() {
   return async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept')
+      return res.end()
+    }
     const u = new URL(req.url || '/', 'http://localhost')
     try {
       if (u.pathname === '/feed') {

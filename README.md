@@ -1,8 +1,20 @@
 # web-complex
 
-WorkBuddy 前端小游戏集合 —— 纯静态、零依赖、单文件 HTML，打开即玩。
+WorkBuddy 前端小游戏集合与应用 —— 纯静态、零依赖、单文件 HTML，打开即玩。
 
-- 入口页面：[`main.html`](main.html)
+## 🌐 在线预览体验 (Online Preview)
+
+GitHub Pages 已部署上线，点击下方链接直接在线体验：
+
+- 🎮 **[游戏与应用总目录](https://mhxy13867806343.github.io/web-complex/)**（推荐）
+- 📱 **[小红书探索页（GitHub Pages 在线版）](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)**
+- ⚡ **[小红书探索页（Node 实时后端完整版）](https://xhs-explore.app.workbuddy.host/)**
+- 📲 **[移动端 H5 游戏专区](https://mhxy13867806343.github.io/web-complex/WorkBuddy/h5/)**
+- 🖥️ **[桌面端 PC 游戏专区](https://mhxy13867806343.github.io/web-complex/WorkBuddy/pc/)**
+
+---
+
+- 本地入口页面：[`main.html`](main.html) / [`index.html`](index.html)
 - H5 端（移动端）：[`WorkBuddy/h5/`](WorkBuddy/h5/index.html)
 - PC 端（桌面端）：[`WorkBuddy/pc/`](WorkBuddy/pc/index.html)
 
@@ -61,7 +73,7 @@ python3 -m http.server 8080
 # 然后访问 http://localhost:8080/main.html
 ```
 
-### 小红书探索页（需要后端接口）
+### 小红书探索页（支持本地开发与在线预览）
 
 ```bash
 cd xiaohongshu
@@ -70,10 +82,9 @@ npm run dev                       # 终端打印地址（5173 被占会自动顺
 # 或本地生产预览：npm run build && npm run start
 ```
 
-> 笔记数据靠运行时 `/api/xhs/*` 接口现抓（匿名访问小红书），**纯静态托管 `dist/` 没有后端会提示「接口不可用」**；
-> 在线预览 / 部署详见 `xiaohongshu/README.md` 的「在线预览与部署」。
-
-桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
+- **在线预览（GitHub Pages）**：[直接体验入口](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)（已配置 GitHub Actions 自动构建部署，纯静态环境自动请求独立在线 API，并内置精选兜底数据保证永不白屏）。
+- **全功能独立在线服务**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)（含实时 Node 抓取后端）。
+- 桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
 
 ## 实现约定
 

@@ -150,18 +150,17 @@ xiaohongshu/
 
 ## 在线预览与部署
 
-本项目是「前端 + Node 接口」一体：笔记数据靠运行时的 `/api/xhs/*`（由 `scripts/server.mjs` 或 dev 中间件提供），
-所以**纯静态托管（只传 `dist/`）会没有后端 → 页面提示「接口不可用」**。
+本项目支持两种在线预览模式：
 
-- **本地开发预览**：`npm run dev` → 终端打印 `http://localhost:5173/`（5173 被占用会**自动顺延端口**，以终端地址为准）。
-  桌面浏览器会渲染成居中「手机」；手机/窄屏铺满。⚠️ 启动命令保持干净，不要在 `npm run dev` 后追加 `#` 注释，
-  否则 Vite 会把 `#` 当成路径参数导致页面打不开。
-- **本地生产预览**：`npm run build && npm run start` → `http://localhost:5173/`（用 `PORT=xxxx npm run start` 改端口）。
-- **GitHub 预览 / 对外在线预览**：把 `npm run start`（Node 服务，已含 `dist/` 托管 + `/api/xhs`）作为 HTTP 服务发布即可
-  （如 WorkBuddy「发布为应用」、或容器 / 云函数跑 `npm run start`），再把链接贴到 GitHub 仓库 README 顶部即为「GitHub 上的预览」。
-  ⚠️ **GitHub Pages 是纯静态托管、跑不了 Node 后端**，直接挂 `dist/` 会显示「接口不可用」，不适合做本项目的在线预览；
-  想要能真实加载笔记的在线预览，必须用能跑 Node 的方式（见上）。
-- 在线预览同样受小红书匿名风控影响：偶发 302 时页面显示缓存数据 / 提示刷新，几分钟后自恢复。
+- **🌐 GitHub Pages 在线预览（静态打包 + Actions 自动发布）**：
+  - **预览地址**：[https://mhxy13867806343.github.io/web-complex/xiaohongshu/](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)
+  - 已通过仓库 `.github/workflows/deploy.yml` 配置 GitHub Actions 自动构建与发布；
+  - 静态页面采用相对路径 `base: './'` 打包，纯静态环境自动请求独立后端接口服务，并在遇到网络或小红书风控时无缝降级到本地精选兜底数据，确保页面稳定展示。
+- **⚡ 全功能独立服务（Node 实时抓取）**：
+  - **在线服务地址**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)
+  - 运行 `scripts/server.mjs`，包含静态产物托管与实时 `/api/xhs/*` 抓取后端，刷新页面即时抓取最新笔记。
+- **💻 本地开发预览**：`npm run dev` → 终端打印 `http://localhost:5173/`。
+- **💻 本地生产预览**：`npm run build && npm run start` → `http://localhost:5173/`。
 
 ## 已知限制（待处理）
 

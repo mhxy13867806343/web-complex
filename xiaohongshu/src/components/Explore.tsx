@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Empty, InfiniteLoading, Loading, SearchBar } from '@nutui/nutui-react'
-import { Photograph, Refresh } from '@nutui/icons-react'
+import { Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
 import { PAGE_SIZE, type Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
@@ -169,24 +168,7 @@ export default function Explore() {
     <div>
       {/* 顶栏 + 频道栏整体吸顶，滚多远都能直接切频道 */}
       <div className="sticky-top">
-        <header className="xhs-header">
-          <div className="xhs-logo">小红书</div>
-          <SearchBar
-            className="xhs-search"
-            shape="round"
-            placeholder="搜索小红书"
-            onInputClick={() => Toast.show({ content: '搜索页（演示）', duration: 1.2 })}
-          />
-          <button
-            type="button"
-            className={`xhs-refresh${busy ? ' spinning' : ''}`}
-            aria-label="刷新"
-            onClick={() => void load(channel)}
-          >
-            <Refresh width={20} height={20} />
-          </button>
-          <Photograph className="xhs-header-icon" width={22} height={22} />
-        </header>
+    
 
         {/* 下拉刷新提示区：随手指位移撑开高度，把内容顶下去 */}
         <div

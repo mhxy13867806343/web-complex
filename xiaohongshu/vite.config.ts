@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import xhsDataServer from './scripts/vite-xhs-data.mjs'
 
 export default defineConfig({
+  base: './',
   plugins: [react(), xhsDataServer()],
   resolve: {
     alias: {

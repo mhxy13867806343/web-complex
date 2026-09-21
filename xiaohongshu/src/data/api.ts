@@ -1,12 +1,13 @@
 import type { Note } from './index'
+import { FALLBACK_CHANNELS, getFallbackFeed } from './fallback'
 
 /**
  * 实时数据接口（/api/xhs/*）。
  *
- * 数据不再有静态快照：分类与笔记全部现抓。
- * - 开发环境：由 scripts/vite-xhs-data.mjs 这个 Vite 中间件提供
- * - 生产环境：由 scripts/server.mjs 这个 Node 服务提供（npm run start）
- * 如果部署成纯静态站点（没有 /api），页面会明确提示接口不可用，而不是显示假数据。
+ * 数据机制：
+ * - 本地开发/生产 Node 环境：通过当前域名下的 /api/xhs/* 实时抓取。
+ * - GitHub Pages 等纯静态环境：优先向已部署的独立在线接口服务请求；
+ *   若遇远程服务网络阻断或风控，自动无缝降级到本地精选兜底数据，确保页面稳定可用。
  */
 
 export interface FeedResult {
@@ -16,6 +17,7 @@ export interface FeedResult {
   count: number
   notes: Note[]
   cached?: boolean
+  stale?: boolean
 }
 
 export interface ChannelItem {
@@ -23,8 +25,25 @@ export interface ChannelItem {
   id: string
 }
 
+const DEFAULT_REMOTE_API = 'https://xhs-explore.app.workbuddy.host'
+
+function getApiBase(): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE
+  }
+  if (typeof window !== 'undefined') {
+    // 若在 GitHub Pages (github.io) 等静态托管环境，代理到已上线的后端服务
+    if (window.location.hostname.endsWith('github.io')) {
+      return DEFAULT_REMOTE_API
+    }
+  }
+  return ''
+}
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, { signal, headers: { Accept: 'application/json' } })
+  const base = getApiBase()
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+  const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
   if (!res.ok) {
     let msg = `HTTP ${res.status}`
     try {
@@ -38,22 +57,27 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T
 }
 
-/** 实时拉取频道分类（分类也是从探索页现读的，不是写死的） */
-export function fetchChannels(signal?: AbortSignal) {
-  return get<{ fetchedAt: string; channels: ChannelItem[] }>('/api/xhs/channels', signal)
+/** 实时拉取频道分类 */
+export async function fetchChannels(signal?: AbortSignal) {
+  try {
+    return await get<{ fetchedAt: string; channels: ChannelItem[] }>('/api/xhs/channels', signal)
+  } catch (err) {
+    console.warn('[api] fetchChannels failed, using fallback channels:', err)
+    return { fetchedAt: new Date().toISOString(), channels: FALLBACK_CHANNELS }
+  }
 }
 
-/**
- * 实时拉取某个流的笔记。
- * @param opts.more 为 true 时追加 `fresh=1`，告知服务端绕过短缓存、
- *                  现抓「新一批」笔记（小红书推荐流是随机的，每次都能拿到新内容）。
- *                  不传或 false 时，服务端会用短缓存，适合首屏/下拉刷新。
- */
+/** 实时拉取某个流的笔记 */
 export async function fetchFeed(
   channel: string,
   opts: { signal?: AbortSignal; more?: boolean } = {}
 ) {
   const qs = new URLSearchParams({ channel })
   if (opts.more) qs.set('fresh', '1')
-  return get<FeedResult>(`/api/xhs/feed?${qs.toString()}`, opts.signal)
+  try {
+    return await get<FeedResult>(`/api/xhs/feed?${qs.toString()}`, opts.signal)
+  } catch (err) {
+    console.warn(`[api] fetchFeed(${channel}) failed, using fallback feed:`, err)
+    return getFallbackFeed(channel)
+  }
 }

@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url'
 import { buildXhsHandler } from './vite-xhs-data.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const DIST = path.join(ROOT, 'dist')
+// 部署时把构建产物拷到 www/（非「构建产物」命名，避免被发布工具当 build output 排除上传）；
+// 本地开发/预览仍用 dist/。运行期 server 只用 Node 内置模块，无需 node_modules。
+const DIST = fs.existsSync(path.join(ROOT, 'www')) ? path.join(ROOT, 'www') : path.join(ROOT, 'dist')
 const PORT = Number(process.env.PORT) || 5173
 const HOST = process.env.HOST || '0.0.0.0'
 

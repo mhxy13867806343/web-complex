@@ -1,0 +1,68 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'xiaohongshu/package.json'
+
+      - name: Install dependencies & Build xiaohongshu
+        run: |
+          cd xiaohongshu
+          npm install --legacy-peer-deps
+          npm run build
+
+      - name: Prepare Pages Artifact
+        run: |
+          mkdir -p _site
+          # 拷贝静态资源与游戏合集
+          cp -r WorkBuddy _site/
+          cp main.html _site/
+          cp main.html _site/index.html
+          # 拷贝小红书构建产物（同时支持 /xiaohongshu/ 和 /xiaohongshu/dist/ 路径）
+          mkdir -p _site/xiaohongshu
+          cp -r xiaohongshu/dist/* _site/xiaohongshu/
+          mkdir -p _site/xiaohongshu/dist
+          cp -r xiaohongshu/dist/* _site/xiaohongshu/dist/
+          # 拷贝说明与许可
+          cp README.md _site/
+          cp LICENSE.md _site/
+          cp LICENSE-EN.md _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
