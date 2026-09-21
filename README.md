@@ -14,6 +14,7 @@ web-complex/
 ├── README.md
 ├── LICENSE.md                许可证（中文）
 ├── LICENSE-EN.md             许可证（英文，最终解释版本）
+├── xiaohongshu/              小红书探索页复刻（React 19 + TS + Vite + NutUI-React）
 └── WorkBuddy/
     ├── h5/                   移动端：触屏 + 竖屏
     │   ├── index.html        H5 游戏列表
@@ -49,7 +50,7 @@ web-complex/
 
 ## 运行方式
 
-无需构建、无需安装依赖，任选其一即可：
+### WorkBuddy 游戏（无需构建）
 
 ```bash
 # 直接用浏览器打开
@@ -59,6 +60,16 @@ open main.html
 python3 -m http.server 8080
 # 然后访问 http://localhost:8080/main.html
 ```
+
+### 小红书探索页（需要构建）
+
+```bash
+cd xiaohongshu
+npm install --legacy-peer-deps    # NutUI 的 peer 依赖只声明到 React 18，需要该参数
+npm run dev                       # http://localhost:5173
+```
+
+桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
 
 ## 实现约定
 
