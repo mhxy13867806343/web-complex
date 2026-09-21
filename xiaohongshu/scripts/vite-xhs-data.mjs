@@ -10,16 +10,35 @@
  *   GET /api/xhs/feed?channel=推荐   -> { channel, channelId, fetchedAt, count, notes }
  *   GET /api/xhs/channels            -> { channels: [{ name, id }] }
  */
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import {
   CHANNEL_FALLBACK,
   EXPLORE_URL,
+  ROOT,
   applyChannelFix,
   channelUrl,
   extractFeeds,
   normalizeFeedItem,
   probe,
   resolveCookie,
+  sleep,
 } from './xhs-client.mjs'
+
+/**
+ * 带重试的探测。
+ * 小红书对匿名访客会「间歇性」风控：偶尔把整站 302 跳到 /login，几分钟后又自行放行。
+ * 所以遇到 302/非 200 不要立刻放弃，隔一会儿重试几次，绝大多数情况能过。
+ */
+async function probeRetry(url, cookie, tries = 3, gapMs = 1200) {
+  let last = null
+  for (let i = 0; i < tries; i++) {
+    last = await probe(url, cookie)
+    if (last.ok) return last
+    if (i < tries - 1) await sleep(gapMs)
+  }
+  return last
+}
 
 /** 频道 id 缓存，避免每次都重新探一次探索页 */
 let cache = { at: 0, list: [] }
@@ -28,6 +47,29 @@ const CACHE_MS = 10 * 60 * 1000
 /** 同一次请求结果的短缓存，防止连点刷新把对方打挂 */
 const feedCache = new Map()
 const FEED_CACHE_MS = 20 * 1000
+
+/**
+ * 落盘缓存：小红书会间歇性把匿名访客 302 到登录页（风控），这时如果内存里没有数据，
+ * 页面就会空掉。把每次成功抓到的结果写到磁盘，风控期间直接读回来顶上，
+ * 这样「抓不到」也不会白屏（放在 node_modules/.cache 下，不进 git）。
+ */
+const DISK_DIR = path.join(ROOT, 'node_modules', '.cache', 'xhs')
+const diskFile = (key) => path.join(DISK_DIR, encodeURIComponent(key) + '.json')
+async function readDisk(key) {
+  try {
+    return JSON.parse(await fs.readFile(diskFile(key), 'utf8'))
+  } catch {
+    return null
+  }
+}
+async function writeDisk(key, data) {
+  try {
+    await fs.mkdir(DISK_DIR, { recursive: true })
+    await fs.writeFile(diskFile(key), JSON.stringify(data))
+  } catch {
+    /* 落盘失败无所谓，不影响主流程 */
+  }
+}
 
 /** 登录 Cookie（启动后惰性读取一次） */
 let resolvedCookie = null
@@ -46,14 +88,19 @@ async function getCookie() {
 async function resolveChannels() {
   if (cache.list.length && Date.now() - cache.at < CACHE_MS) return cache.list
   const cookie = await getCookie()
-  const home = await probe(EXPLORE_URL, cookie)
-  const list = applyChannelFix(
-    home.categories.length > 0
-      ? home.categories.filter((c) => c.id)
-      : CHANNEL_FALLBACK
+  const home = await probeRetry(EXPLORE_URL, cookie)
+  const cats = home.categories.length > 0 ? home.categories.filter((c) => c.id) : []
+  if (cats.length > 0) {
+    const list = applyChannelFix(cats)
+    cache = { at: Date.now(), list }
+    void writeDisk('__channels__', list)
+    return list
+  }
+  // 抓不到：内存 → 磁盘 → 兜底表
+  const disk = await readDisk('__channels__')
+  return applyChannelFix(
+    cache.list.length > 0 ? cache.list : Array.isArray(disk) && disk.length ? disk : CHANNEL_FALLBACK
   )
-  if (list.length) cache = { at: Date.now(), list }
-  return list
 }
 
 function send(res, code, data) {
@@ -84,12 +131,25 @@ async function fetchFeed(channel, fresh = false) {
   }
 
   const cookie = await getCookie()
-  const r = await probe(url, cookie)
+  const r = await probeRetry(url, cookie)
   if (!r.ok) {
+    // 重试仍失败：优先返回上一次抓到的好数据，让页面继续有内容，
+    // 而不是直接 502 让前端显示「接口不可用」。内存 → 磁盘 依次兜底。
+    const stale = feedCache.get(channel)?.data
+    if (stale) {
+      console.warn(`[api/xhs] ${channel} 抓取失败（HTTP ${r.status}），用内存里的上一次数据顶上`)
+      return { ...stale, cached: true, stale: true }
+    }
+    const disk = await readDisk('feed:' + channel)
+    if (disk) {
+      console.warn(`[api/xhs] ${channel} 抓取失败（HTTP ${r.status}），用磁盘缓存顶上`)
+      feedCache.set(channel, { at: Date.now(), data: disk })
+      return { ...disk, cached: true, stale: true }
+    }
     throw Object.assign(
       new Error(
         r.status === 302
-          ? '小红书当前要求登录（302），稍等一会儿或配置 Cookie 后再试'
+          ? '小红书临时风控拦截（302 跳登录页），一般几分钟后自动恢复、无需登录；稍后点右上角刷新重试即可'
           : `小红书返回 HTTP ${r.status}`
       ),
       { code: 502 }
@@ -105,6 +165,7 @@ async function fetchFeed(channel, fresh = false) {
     notes,
   }
   feedCache.set(channel, { at: Date.now(), data })
+  void writeDisk('feed:' + channel, data)
   return { ...data, cached: false }
 }
 
