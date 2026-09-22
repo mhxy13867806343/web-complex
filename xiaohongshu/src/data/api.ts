@@ -372,6 +372,16 @@ export interface SearchResultData {
   page?: number
   pageSize?: number
   hasMore?: boolean
+  officialUser?: {
+    name: string
+    avatar: string
+    userId: string
+    redId?: string
+    verified?: boolean
+    updatedText?: string
+    desc?: string
+    userUrl?: string
+  } | null
 }
 
 /**
@@ -404,11 +414,25 @@ export async function fetchSearchResultsApi(
   }
 
   // 静态或离线兜底：从 STATIC_FEEDS 检索
+  const kwLower = keyword.trim().toLowerCase()
+  const isFcf = kwLower.includes('范丞丞') || kwLower.includes('丞丞')
+  const fcfOfficialUser = isFcf
+    ? {
+        name: '范丞丞',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '635402289',
+        redId: '635402289',
+        verified: true,
+        updatedText: '7天前更新',
+        desc: '歌手 · 粉丝 · 386.5万 · 笔记 · 108',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/635402289',
+      }
+    : null
+
   const pool: Note[] = []
   for (const list of Object.values(STATIC_FEEDS)) {
     pool.push(...list)
   }
-  const kwLower = (keyword || '').toLowerCase()
   let matched = pool.filter((n) => {
     return (
       (n.title && n.title.toLowerCase().includes(kwLower)) ||
@@ -417,9 +441,29 @@ export async function fetchSearchResultsApi(
       (n.author?.name && n.author.name.toLowerCase().includes(kwLower))
     )
   })
+
+  // 若无精准字面匹配，智能合成包含当前搜索词的丰富双形态卡片流（图文 + 视频兼备）
   if (matched.length === 0) {
-    matched = pool.slice(0, 24)
+    matched = pool.slice(0, 24).map((n, i) => {
+      const isVid = i % 2 === 1
+      return {
+        ...n,
+        id: `static_synth_${kwLower}_${n.id || i}`,
+        title:
+          i === 0
+            ? `${keyword} 精彩瞬间合集`
+            : i === 1
+            ? `${keyword} 到底有多绝 看完惊呆了`
+            : i === 2
+            ? `${keyword} 到底哪里帅`
+            : `${keyword} · ${n.title || '精选分享'}`,
+        type: isVid ? 'video' : 'normal',
+        isVideo: isVid,
+        tags: [keyword, '热门', ...(n.tags || [])],
+      } as Note
+    })
   }
+
   if (options.noteType === 'video') {
     matched = matched.filter((n) => n.type === 'video' || Boolean((n as any).isVideo))
   } else if (options.noteType === 'image') {
@@ -439,15 +483,20 @@ export async function fetchSearchResultsApi(
   const pagedNotes = matched.slice(start, start + ps)
   const hasMore = start + ps < matched.length
 
+  const subTags = isFcf
+    ? ['综合', '照片神图', '刀马舞', '头像', '青岛', '媳妇', '肌肉', '上海', '玩三角洲', '搞笑', '手势舞', '锁屏壁纸']
+    : ['综合', `${keyword}精选`, `${keyword}合集`, `${keyword}同款`, `${keyword}日常`, '高赞推荐', '最新分享']
+
   return {
     keyword,
-    subTags: ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略'],
+    subTags,
     activeSubTag: options.subTag || '综合',
     total: matched.length,
     notes: pagedNotes,
     page: p,
     pageSize: ps,
     hasMore,
+    officialUser: fcfOfficialUser,
   }
 }
 

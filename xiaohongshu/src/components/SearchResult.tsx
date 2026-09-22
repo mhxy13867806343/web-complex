@@ -461,6 +461,51 @@ export default function SearchResult({
         </button>
       </div>
 
+      {/* 官方认证博主卡片（对齐图 1 范丞丞官方认证展示） */}
+      {data?.officialUser && activeTab === 'all' && (
+        <div
+          className="search-official-user-banner"
+          onClick={() => onOpenUser(data.officialUser)}
+        >
+          <div className="search-official-avatar-wrap">
+            <img
+              src={data.officialUser.avatar}
+              alt={data.officialUser.name}
+              className="search-official-avatar"
+              onError={(e) => {
+                ;(e.currentTarget as HTMLImageElement).src =
+                  'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'
+              }}
+            />
+          </div>
+          <div className="search-official-info">
+            <div className="search-official-title-row">
+              <span className="search-official-name">{data.officialUser.name}</span>
+              <span className="search-verified-badge" title="小红书认证">✔</span>
+              {data.officialUser.updatedText && (
+                <span className="search-official-updated">{data.officialUser.updatedText}</span>
+              )}
+            </div>
+            <div className="search-official-sub">
+              小红书号：{data.officialUser.redId || data.officialUser.userId}
+            </div>
+            <div className="search-official-stats">
+              {data.officialUser.desc}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="search-official-follow-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenUser(data.officialUser)
+            }}
+          >
+            关注
+          </button>
+        </div>
+      )}
+
       {/* 二级横向热词选择条（复用首页 ChannelChips 组件，支持拖拽横滑、滚轮、自动居中、翻页箭头） */}
       <div className="search-subtags-bar">
         <ChannelChips
@@ -629,27 +674,45 @@ export default function SearchResult({
           </div>
         ) : activeTab === 'user' ? (
           <div className="search-user-list">
-            {notesList.slice(0, 6).map((n) => (
-              <div
-                key={n.id}
-                className="search-user-card"
-                onClick={() => onOpenUser(n.author)}
-              >
-                <img
-                  src={n.author.avatar || 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'}
-                  alt={n.author.name}
-                  className="search-user-avatar"
-                  onError={(e) => {
-                    ;(e.currentTarget as HTMLImageElement).src =
-                      'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'
-                  }}
-                />
-                <div className="search-user-info">
-                  <div className="search-user-name">{n.author.name}</div>
-                  <div className="search-user-sub">小红书号：{n.author.userId?.slice(0, 8) || 'red_creator'} · 笔记 {Math.floor(10 + Math.random() * 40)}</div>
+            {(data?.officialUser
+              ? [
+                  {
+                    id: data.officialUser.userId,
+                    author: data.officialUser,
+                  },
+                  ...notesList.filter((n) => n.author?.name !== data.officialUser?.name),
+                ]
+              : notesList
+            )
+              .slice(0, 8)
+              .map((n) => (
+                <div
+                  key={n.id}
+                  className="search-user-card"
+                  onClick={() => onOpenUser(n.author)}
+                >
+                  <img
+                    src={n.author.avatar || 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'}
+                    alt={n.author.name}
+                    className="search-user-avatar"
+                    onError={(e) => {
+                      ;(e.currentTarget as HTMLImageElement).src =
+                        'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'
+                    }}
+                  />
+                  <div className="search-user-info">
+                    <div className="search-user-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>{n.author.name}</span>
+                      {(n.author as any).verified && (
+                        <span className="search-verified-badge" title="小红书认证">✔</span>
+                      )}
+                    </div>
+                    <div className="search-user-sub">
+                      小红书号：{n.author.userId?.slice(0, 10) || 'red_creator'} · 笔记 {Math.floor(10 + Math.random() * 40)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         ) : notesList.length === 0 ? (
           <div className="search-empty-box">

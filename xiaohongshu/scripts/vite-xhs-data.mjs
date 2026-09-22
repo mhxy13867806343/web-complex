@@ -781,6 +781,7 @@ export async function searchNotesApi({
   pageSize = 12,
 }) {
   const kw = keyword.replace(/^#/, '').trim().toLowerCase()
+  const isFanChengcheng = kw.includes('范丞丞') || kw.includes('丞丞')
   const isVlog = kw.includes('vlog')
   const isMovieNight =
     kw.includes('了不起') ||
@@ -789,7 +790,9 @@ export async function searchNotesApi({
 
   // 二级热词/标签栏（对齐图 1 & 图 2）
   let subTags = ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略']
-  if (isMovieNight) {
+  if (isFanChengcheng) {
+    subTags = ['综合', '照片神图', '刀马舞', '头像', '青岛', '媳妇', '肌肉', '上海', '玩三角洲', '搞笑', '手势舞', '锁屏壁纸']
+  } else if (isMovieNight) {
     subTags = ['综合', '完整版', '电影口碑', '精彩时刻', '影视解说', '喜剧片段', '花絮', '高清在线', '幕后揭秘']
   } else if (isVlog) {
     subTags = ['综合', '西安', '日常生活', '杭州', '上学日记', '南京', '长沙', '治愈系', '新加坡', '打工人', '青岛', '马来西亚']
@@ -978,6 +981,243 @@ export async function searchNotesApi({
     },
   ]
 
+  // 2. 范丞丞专属高保真全真数据集（对齐图 1 & 图 2）
+  const fcfOfficialUser = {
+    name: '范丞丞',
+    avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+    userId: '635402289',
+    redId: '635402289',
+    verified: true,
+    updatedText: '7天前更新',
+    desc: '歌手 · 粉丝 · 386.5万 · 笔记 · 108',
+    userUrl: 'https://www.xiaohongshu.com/user/profile/635402289',
+  }
+
+  const fanChengchengNotes = [
+    {
+      id: 'fcc_note_1',
+      title: '丞丞：唉……干嘛呢 别拿走我的玩具车啊 我还要玩呢 😭😭',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/f810f3c84121eaf170d82b8a0730e499/1000g0082q5lf036k806g489c281532ck2k25d2o!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 1205,
+      author: {
+        name: '范丞丞资讯台',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '635402289',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/635402289',
+      },
+      tags: ['范丞丞', '玩玩具', '可爱瞬间', '综艺名场面', '搞笑'],
+      date: '03-12',
+    },
+    {
+      id: 'fcc_note_2',
+      title: '范丞丞到底哪里帅',
+      desc: '很多人不理解范丞丞的帅点，看完这组图你就懂了！五官立体，优越头身比，生图状态一绝！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/11934cf722a7c27fef250d26ed436de5/1000g0082onup4psk606g5om83em0g6c87aafun0!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'normal',
+      isVideo: false,
+      likes: 175,
+      author: {
+        name: '橘橘脑袋',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+        userId: '5d69dbca00000000010081fc',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5d69dbca00000000010081fc',
+      },
+      tags: ['范丞丞', '照片神图', '帅哥', '颜值天花板', '生图'],
+      date: '1天前',
+    },
+    {
+      id: 'fcc_note_3',
+      title: '白鹿太美 范丞丞太帅！！！！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/c075057b19cb3197be34f741bcf63e8d/1000g0082pbq9kvkjq0004a3p3ru0doovflf75r0!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 886,
+      author: {
+        name: '娱乐星追击',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64317c2ac2358b601fc78edd.jpg',
+        userId: '64317c2ac2358b601fc78edd',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64317c2ac2358b601fc78edd',
+      },
+      tags: ['范丞丞', '白鹿', '高颜值同框', '综艺', '神仙颜值'],
+      date: '04-18',
+    },
+    {
+      id: 'fcc_note_4',
+      title: '章若楠：没想到你是这样的范丞丞！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/726ff98e9eb3c84c843366f21dabf074/1040g00830mvolhq254205o5oo17g8iuetklvnn0!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 230,
+      author: {
+        name: '腾讯综艺满级小鹅',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/619e07bd33c29472034c3dd7.jpg',
+        userId: '619e07bd33c29472034c3dd7',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/619e07bd33c29472034c3dd7',
+      },
+      tags: ['范丞丞', '章若楠', '搞笑', '综艺日常', '爆笑互动'],
+      date: '1小时前',
+    },
+    {
+      id: 'fcc_note_5',
+      title: '此时范丞丞的粉笔在南昌应援，排面拉满！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/5ad085e460a20984bfd5345790cd3269/1000g0082p3odmi8k60005nit8i4g8hu2grn2qrg!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 512,
+      author: {
+        name: '南昌站小红薯',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64159a23aab651ae65a49601.jpg',
+        userId: '64159a23aab651ae65a49601',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64159a23aab651ae65a49601',
+      },
+      tags: ['范丞丞', '南昌应援', '演唱会', '粉丝现场'],
+      date: '05-20',
+    },
+    {
+      id: 'fcc_note_6',
+      title: '范丞丞超绝生图！九宫格壁纸高清打包 ✨',
+      desc: '不用修图的原生神图，每一张都能直接当锁屏！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/5a3fb5d74554950daa866bfe441824c3/1000g0082p476ibuk40004a4nt9fru98od6ds8d0!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'normal',
+      isVideo: false,
+      likes: 1420,
+      author: {
+        name: '饭圈神图收纳站',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '6054fe950000000005774a42',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/6054fe950000000005774a42',
+      },
+      tags: ['范丞丞', '照片神图', '高清壁纸', '锁屏壁纸', '头像'],
+      date: '06-01',
+    },
+    {
+      id: 'fcc_note_7',
+      title: '范丞丞《刀马舞》直拍现场高燃混剪 🔥',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/a8cbcae0deaac0c412d10304c112edf5/1040g00830mq31cqjkme05obuia40ko9skr01s20!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 3200,
+      author: {
+        name: '舞台直拍狂魔',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+        userId: '5d69dbca00000000010081fc',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5d69dbca00000000010081fc',
+      },
+      tags: ['范丞丞', '刀马舞', '舞台直拍', '舞蹈', '高燃'],
+      date: '06-18',
+    },
+    {
+      id: 'fcc_note_8',
+      title: '范丞丞青岛私服穿搭分析！松弛感男友风',
+      desc: '青岛小哥的日常时髦搭配，简简单单的卫衣工装裤却穿出了顶级松弛感！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/193b8c0824eaa2c1c77f37c27029c899/1040g00830ms75ej8ki005o1c54c0bid2gj8cp98!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'normal',
+      isVideo: false,
+      likes: 628,
+      author: {
+        name: '时髦打卡机',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64317c2ac2358b601fc78edd.jpg',
+        userId: '64317c2ac2358b601fc78edd',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64317c2ac2358b601fc78edd',
+      },
+      tags: ['范丞丞', '青岛', '男生穿搭', '明星私服', '男友风'],
+      date: '07-02',
+    },
+    {
+      id: 'fcc_note_9',
+      title: '范丞丞玩三角洲行动高能名场面',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/808b2812fa5cf182a2b3ee025d9fa01b/1040g00830mqtgabhkm004a5stg0svks5otci080!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 1150,
+      author: {
+        name: '电竞高光时刻',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/619e07bd33c29472034c3dd7.jpg',
+        userId: '619e07bd33c29472034c3dd7',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/619e07bd33c29472034c3dd7',
+      },
+      tags: ['范丞丞', '玩三角洲', '游戏直播', '三角洲行动', '电竞'],
+      date: '08-11',
+    },
+    {
+      id: 'fcc_note_10',
+      title: '范丞丞肌肉线条太绝了！自律健身日常',
+      desc: '脱衣有肉穿衣显瘦！这自律的身材管理真的让人佩服，肌肉线条充满荷尔蒙！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/4e24a0689278cb5a3ceb40670e6f7eb7/1000g0082qhbmcriju06g5ok7o0j8crmm66h298g!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'normal',
+      isVideo: false,
+      likes: 2200,
+      author: {
+        name: '腹肌训练所',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '6054fe950000000005774a42',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/6054fe950000000005774a42',
+      },
+      tags: ['范丞丞', '肌肉', '健身', '身材管理', '照片神图'],
+      date: '08-25',
+    },
+    {
+      id: 'fcc_note_11',
+      title: '范丞丞搞笑手势舞名场面合集 😂',
+      desc: '一本正经地搞笑，手势舞跳出了喜剧人的精髓，看一次笑一次！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/9be448378f8b9a532d5070ac8608424b/1000g0082p2kcfbck60004bv0ki9buu56vab9298!nc_n_nwebp_mw_1',
+      coverWidth: 1440,
+      coverHeight: 1920,
+      type: 'normal',
+      isVideo: false,
+      likes: 980,
+      author: {
+        name: '快乐源泉搬运工',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64159a23aab651ae65a49601.jpg',
+        userId: '64159a23aab651ae65a49601',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64159a23aab651ae65a49601',
+      },
+      tags: ['范丞丞', '搞笑', '手势舞', '幽默', '快乐源泉'],
+      date: '09-02',
+    },
+    {
+      id: 'fcc_note_12',
+      title: '范丞丞锁屏高清壁纸分享 📱 双击抱走',
+      desc: '精选上海活动高清九宫格原图，超帅壁纸自取！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/7a0b17a8242058434e75f42c77aa02c0/spectrum/1040g0k030mpslgqtki005n3d5oekia2n34gapbg!nc_n_nwebp_mw_1',
+      coverWidth: 850,
+      coverHeight: 850,
+      type: 'normal',
+      isVideo: false,
+      likes: 1830,
+      author: {
+        name: '壁纸收集馆',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+        userId: '5d69dbca00000000010081fc',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5d69dbca00000000010081fc',
+      },
+      tags: ['范丞丞', '锁屏壁纸', '上海', '照片神图', '壁纸'],
+      date: '09-18',
+    },
+  ]
+
   // 3. 从全站所有磁盘缓存频道与静态池中搜寻
   let pool = []
   try {
@@ -1015,7 +1255,9 @@ export async function searchNotesApi({
 
   // 准备初始置顶匹配集合
   let allNotes = []
-  if (isMovieNight) {
+  if (isFanChengcheng) {
+    allNotes.push(...fanChengchengNotes)
+  } else if (isMovieNight) {
     allNotes.push(...movieNightNotes)
   } else if (isVlog) {
     allNotes.push(...vlogSpecialNotes)
@@ -1082,11 +1324,30 @@ export async function searchNotesApi({
   scoredNotes.sort((a, b) => b.score - a.score)
   allNotes.push(...scoredNotes.map((s) => s.note))
 
-  // 兜底保护：若任何词都匹配不到，拉取最相关的热门频道内容，绝不让用户看到空屏
+  // 兜底保护：若任何词都匹配不到，智能合成带当前搜索词的丰富卡片（图文 + 视频双全，绝不让用户看到空屏）
   if (allNotes.length === 0) {
-    const isMovieRelated = kw.includes('影') || kw.includes('剧') || kw.includes('电影') || kw.includes('夜')
-    const fallbackNotes = (await readDisk(isMovieRelated ? 'feed:影视' : 'feed:推荐'))?.notes || []
-    allNotes = fallbackNotes.slice(0, 16)
+    const baseList = pool.length ? pool : (await loadStaticFallbackFeed('推荐'))
+    allNotes = baseList.slice(0, 24).map((n, i) => {
+      const isVid = i % 2 === 1
+      return {
+        ...n,
+        id: `search_synth_${kw}_${n.id || i}`,
+        title:
+          i === 0
+            ? `${keyword} 精彩瞬间合集`
+            : i === 1
+            ? `${keyword} 到底有多绝 看完惊呆了`
+            : i === 2
+            ? `关于 ${keyword} 的那些事，建议收藏 ✨`
+            : `${keyword} · ${n.title || '精选分享'}`,
+        type: isVid ? 'video' : 'normal',
+        isVideo: isVid,
+        tags: [keyword, '热门', ...(n.tags || [])],
+      }
+    })
+    if (!subTags || subTags.length <= 6) {
+      subTags = ['综合', `${keyword}精选`, `${keyword}合集`, `${keyword}同款`, `${keyword}日常`, '高赞推荐', '最新分享']
+    }
   }
 
   // 二级 subTag 联动筛选
@@ -1133,6 +1394,7 @@ export async function searchNotesApi({
     hasMore,
     total: allNotes.length,
     notes: pagedNotes,
+    officialUser: isFanChengcheng ? fcfOfficialUser : null,
   }
 }
 

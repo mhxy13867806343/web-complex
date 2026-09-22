@@ -2591,3 +2591,103 @@
 .search-page-container .nut-infinite__bottom {
   color: rgba(255, 255, 255, 0.45);
 }
+
+/* 官方认证博主横幅卡片（对齐图 1 范丞丞认证卡片） */
+.search-official-user-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #1e2027;
+  margin: 10px 10px 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+
+.search-official-user-banner:hover {
+  background: #252832;
+}
+
+.search-official-avatar-wrap {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.search-official-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.search-official-info {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-official-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-official-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.search-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--xhs-red, #ff2442);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.search-official-updated {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 2px;
+}
+
+.search-official-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.search-official-stats {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.search-official-follow-btn {
+  flex-shrink: 0;
+  padding: 6px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.search-official-follow-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+}
