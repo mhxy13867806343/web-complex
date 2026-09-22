@@ -127,10 +127,6 @@ button {
   border-top: 0.5px solid #eee;
 }
 
-.app-tabbar .nut-tabbar-item:has(.live-tab-icon) .nut-badge {
-  display: none;
-}
-
 .page-body::-webkit-scrollbar {
   display: none;
 }

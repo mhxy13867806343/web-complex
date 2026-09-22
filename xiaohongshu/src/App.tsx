@@ -6,7 +6,6 @@ import SearchResult from './components/SearchResult'
 import MobileEnvDialog from './components/MobileEnvDialog'
 import BottomTabBar from './components/BottomTabBar'
 import RedVideo from './components/RedVideo'
-import LiveList from './components/LiveList'
 import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl } from './router'
 
 /**
@@ -21,7 +20,6 @@ export default function App() {
   const [searchMounted, setSearchMounted] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState('vlog')
   const [videoMounted, setVideoMounted] = useState(false)
-  const [liveMounted, setLiveMounted] = useState(false)
 
   useEffect(() => {
     if (route.name === 'search') {
@@ -34,10 +32,9 @@ export default function App() {
       setSearchMounted(false)
     }
     if (route.name === 'video') setVideoMounted(true)
-    if (route.name === 'live') setLiveMounted(true)
   }, [route.name, route.keyword])
 
-  const showTab = route.name === 'home' || route.name === 'video' || route.name === 'live'
+  const showTab = route.name === 'home' || route.name === 'video'
 
   return (
     <div className="phone">
@@ -67,19 +64,6 @@ export default function App() {
           }}
         >
           <RedVideo />
-        </div>
-      )}
-      {liveMounted && (
-        <div
-          className="page-body"
-          id="live-page-body"
-          style={{
-            visibility: route.name === 'live' ? 'visible' : 'hidden',
-            pointerEvents: route.name === 'live' ? 'auto' : 'none',
-            zIndex: route.name === 'live' ? 1 : 0,
-          }}
-        >
-          <LiveList active={route.name === 'live'} />
         </div>
       )}
       </div>

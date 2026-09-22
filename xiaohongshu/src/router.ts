@@ -4,7 +4,7 @@ import { dismissRequestToast } from './utils/loadingToast'
 
 export interface RouteInfo {
   path: string
-  name: 'home' | 'user' | 'note' | 'search' | 'video' | 'live'
+  name: 'home' | 'user' | 'note' | 'search' | 'video'
   userId?: string
   noteId?: string
   author?: Author
@@ -139,7 +139,7 @@ export function parseRoute(rawUrl?: string): RouteInfo {
     }
 
     if (pathname === '/livelist' || pathname.startsWith('/livestream')) {
-      return { path: pathname, name: 'live', query }
+      return { path: '/', name: 'home', query: {} }
     }
 
     // 匹配搜索结果页路由：/search_result/、/search_result 或 /search
@@ -266,12 +266,25 @@ export function openSearchResultRoute(keyword: string, options?: { type?: string
 /**
  * React 路由订阅 Hook
  */
+function redirectAwayFromLive() {
+  if (typeof window === 'undefined') return
+  const path = window.location.pathname
+  if (path === '/livelist' || path.startsWith('/livestream')) {
+    navigate(getExploreUrl(), true)
+  }
+}
+
 export function useRoute(): RouteInfo {
   const [route, setRoute] = useState<RouteInfo>(() => parseRoute())
 
   useEffect(() => {
+    redirectAwayFromLive()
     const handleRouteChange = () => {
       dismissRequestToast()
+      if (window.location.pathname === '/livelist' || window.location.pathname.startsWith('/livestream')) {
+        navigate(getExploreUrl(), true)
+        return
+      }
       setRoute(parseRoute())
     }
 

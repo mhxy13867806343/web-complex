@@ -4,10 +4,9 @@ import { getExploreUrl, navigate, type RouteInfo } from '../router'
 const TABS = [
   { name: 'home' as const, title: '发现', path: '/' },
   { name: 'video' as const, title: 'RED', path: '/red_video' },
-  { name: 'live' as const, title: '直播', path: '/livelist' },
 ]
 
-function TabIcon({ kind, active }: { kind: 'home' | 'video' | 'live'; active: boolean }) {
+function TabIcon({ kind, active }: { kind: 'home' | 'video'; active: boolean }) {
   const color = active ? '#ff2442' : '#999'
   if (kind === 'home') {
     return (
@@ -24,7 +23,7 @@ function TabIcon({ kind, active }: { kind: 'home' | 'video' | 'live'; active: bo
       </svg>
     )
   }
-  return <span className="live-tab-icon" hidden />
+  return null
 }
 
 export default function BottomTabBar({ routeName }: { routeName: RouteInfo['name'] }) {
