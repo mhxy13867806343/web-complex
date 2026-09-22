@@ -5,6 +5,7 @@ dist/
 www/
 .smoke/
 **/.xhs-cookie
+**/.xhs-live-sign.json
 *.genie
 .workbuddy/applications.yaml
 .workbuddy/memory/automations/

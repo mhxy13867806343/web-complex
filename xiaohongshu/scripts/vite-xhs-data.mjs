@@ -19,6 +19,7 @@ import {
   applyChannelFix,
   channelUrl,
   extractFeeds,
+  httpGet,
   normalizeFeedItem,
   probe,
   resolveCookie,
@@ -75,16 +76,15 @@ async function writeDisk(key, data) {
   }
 }
 
-/** 登录 Cookie（启动后惰性读取一次） */
-let resolvedCookie = null
+/** 登录 Cookie。空结果不缓存，方便之后写入 .xhs-cookie。 */
+let resolvedCookie = ''
 async function getCookie() {
-  if (resolvedCookie === null) {
-    try {
-      const { cookie } = await resolveCookie('')
-      resolvedCookie = cookie
-    } catch {
-      resolvedCookie = ''
-    }
+  if (resolvedCookie) return resolvedCookie
+  try {
+    const { cookie } = await resolveCookie('')
+    resolvedCookie = cookie || ''
+  } catch {
+    resolvedCookie = ''
   }
   return resolvedCookie
 }
@@ -772,6 +772,21 @@ export async function fetchUserDetail(userId, name, avatar, token) {
 /**
  * 搜索笔记（对齐小红书官方搜索结果页 /search_result/?keyword=...）
  */
+/** Normalize a feed note for search: ensure isVideo, tags, etc. are set */
+function normalizeNoteForSearch(n, channelName) {
+  const note = { ...n }
+  if (note.isVideo === undefined || note.isVideo === null) {
+    note.isVideo = note.type === 'video'
+  }
+  if (channelName) note.channel = channelName
+  if (!Array.isArray(note.tags)) {
+    note.tags = channelName ? [channelName] : []
+  } else if (channelName && !note.tags.includes(channelName)) {
+    note.tags = [...note.tags, channelName]
+  }
+  return note
+}
+
 export async function searchNotesApi({
   keyword = '',
   sort = 'general',
@@ -1221,6 +1236,14 @@ export async function searchNotesApi({
 
   // 3. 从全站所有磁盘缓存频道与静态池中搜寻
   let pool = []
+  // 3a. 从 feedCache（内存中的实时缓存）中搜寻
+  for (const [chKey, entry] of feedCache.entries()) {
+    const feedNotes = entry?.data?.notes || []
+    for (const n of feedNotes) {
+      pool.push(normalizeNoteForSearch(n, chKey))
+    }
+  }
+  // 3b. 从磁盘缓存文件中搜寻
   try {
     const files = await fs.readdir(DISK_DIR)
     for (const file of files) {
@@ -1229,28 +1252,25 @@ export async function searchNotesApi({
         const feedData = JSON.parse(await fs.readFile(path.join(DISK_DIR, file), 'utf8'))
         if (feedData?.notes) {
           for (const n of feedData.notes) {
-            pool.push({
-              ...n,
-              channel: channelName,
-              tags: Array.isArray(n.tags) ? [...n.tags, channelName] : [channelName],
-            })
+            if (!pool.some(p => p.id === n.id)) {
+              pool.push(normalizeNoteForSearch(n, channelName))
+            }
           }
         }
       }
     }
   } catch {}
 
-  if (!pool.length) {
-    const channels = ['推荐', '影视', '穿搭', '美食', '职场', '彩妆']
-    for (const ch of channels) {
-      const list = await loadStaticFallbackFeed(ch)
-      for (const n of list) {
-        pool.push({
-          ...n,
-          channel: ch,
-          tags: Array.isArray(n.tags) ? [...n.tags, ch] : [ch],
-        })
-      }
+  // 静态兜底始终并入（按 id 去重）。磁盘里只有部分频道时，
+  // 否则「美食」这类词匹配不到对应频道的离线笔记。
+  const staticChannels = ['推荐', '影视', '穿搭', '美食', '职场', '彩妆', '家居', '旅行', '游戏', '健身', '情感', '视频']
+  const seenIds = new Set(pool.map((p) => p.id))
+  for (const ch of staticChannels) {
+    const list = await loadStaticFallbackFeed(ch)
+    for (const n of list) {
+      if (seenIds.has(n.id)) continue
+      seenIds.add(n.id)
+      pool.push(normalizeNoteForSearch(n, ch))
     }
   }
 
@@ -1327,7 +1347,9 @@ export async function searchNotesApi({
 
   // 兜底保护：若任何词都匹配不到，智能合成带当前搜索词的丰富卡片（图文 + 视频双全，绝不让用户看到空屏）
   if (allNotes.length === 0) {
-    const baseList = pool.length ? pool : (await loadStaticFallbackFeed('推荐'))
+    const baseList = pool.length
+      ? pool
+      : (await loadStaticFallbackFeed('推荐')).map((n) => normalizeNoteForSearch(n, '推荐'))
     allNotes = baseList.slice(0, 24).map((n, i) => {
       const isVid = i % 2 === 1
       return {
@@ -1591,6 +1613,12 @@ export function buildXhsHandler() {
         const data = await getHotSearches(keyword)
         return send(res, 200, data)
       }
+      if (u.pathname === '/live') {
+        const cursor = u.searchParams.get('cursor_score') || u.searchParams.get('cursor') || '0'
+        const category = u.searchParams.get('category') || '0'
+        const data = await fetchLiveSquare(cursor, category)
+        return send(res, 200, data)
+      }
       if (u.pathname === '/user') {
         const userId = u.searchParams.get('id') || ''
         const name = u.searchParams.get('name') || ''
@@ -1602,8 +1630,112 @@ export function buildXhsHandler() {
       return send(res, 404, { error: 'not found' })
     } catch (e) {
       console.warn('[api/xhs]', e?.message || e)
-      return send(res, e?.code || 500, { error: e?.message || String(e) })
+      const status = Number(e?.code)
+      const http = status >= 400 && status <= 599 ? status : 502
+      return send(res, http, { error: e?.message || String(e) })
     }
+  }
+}
+
+function pickLiveText(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function normalizeLiveRoom(feed) {
+  const live = feed?.live || feed || {}
+  const room = live.tRoomInfo || live.t_room_info || live.roomInfo || live.room || {}
+  const host = live.tLiveHostInfo || live.t_live_host_info || room.host || room.user || live.host || live.user || {}
+  const coverInfo = room.coverInfo || room.cover_info || live.coverInfo || {}
+  const roomId = String(room.room_id_str || room.roomIdStr || room.roomId || room.room_id || live.roomId || feed?.roomId || '')
+  if (!roomId || roomId === '0') return null
+  return {
+    roomId,
+    title: pickLiveText(room.title, room.name, live.title, host.nickname, '直播'),
+    cover: pickLiveText(coverInfo.cover_image, coverInfo.coverImage, coverInfo.url, coverInfo.coverUrl, coverInfo.cover, room.cover, live.cover),
+    nickname: pickLiveText(host.nickname, host.name, host.nickName, room.nickname),
+    avatar: pickLiveText(host.avatar, host.avatarUrl, host.image),
+    viewers: String(room.display_count ?? room.displayCount ?? room.member_count ?? room.viewerCount ?? room.viewCount ?? live.viewerCount ?? ''),
+    cursorScore: String(feed?.cursor_score || feed?.cursorScore || room.cursorScore || ''),
+  }
+}
+
+/** 与网页端一致：只编码花括号和引号，冒号、方括号、逗号保持原样。 */
+function liveSquareQuery(cursor, category) {
+  const extra = '%7B%22image_formats%22:[%22jpg%22,%22webp%22,%22avif%22]%7D'
+  return [
+    `cursor_score=${cursor || '0'}`,
+    'source=13',
+    `category=${category}`,
+    'pre_source=',
+    `extra_info=${extra}`,
+    'size=27',
+  ].join('&')
+}
+
+const LIVE_BROWSER_HEADERS = {
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
+  Origin: 'https://www.xiaohongshu.com',
+  Referer: 'https://www.xiaohongshu.com/',
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
+  'sec-ch-ua': '"Google Chrome";v="153", "Not_A Brand";v="8", "Chromium";v="153"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"macOS"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-site',
+  priority: 'u=1, i',
+  'xy-common-params': 'platform=web',
+}
+
+/** x-s / x-s-common / x-t 按请求绑定，放在 gitignore 的 .xhs-live-sign.json。 */
+async function liveSignHeaders(category) {
+  try {
+    const raw = await fs.readFile(path.join(ROOT, '.xhs-live-sign.json'), 'utf8')
+    const sign = JSON.parse(raw)
+    if (sign.category != null && String(sign.category) !== String(category)) return {}
+    const headers = {}
+    if (sign['x-s']) headers['x-s'] = sign['x-s']
+    if (sign['x-s-common']) headers['x-s-common'] = sign['x-s-common']
+    if (sign['x-t']) headers['x-t'] = String(sign['x-t'])
+    return headers
+  } catch {
+    return {}
+  }
+}
+
+/** 直播广场：live-room squarefeed。匿名请求常被网关拒绝，失败时返回空列表而不是把首页流塞进来。 */
+async function fetchLiveSquare(cursor = '0', category = '0') {
+  const cookie = await getCookie()
+  const safeCategory = /^[0-6]$/.test(String(category)) ? String(category) : '0'
+  const url = `https://live-room.xiaohongshu.com/api/sns/red/live/web/feed/v1/squarefeed?${liveSquareQuery(cursor, safeCategory)}`
+  const res = await httpGet(url, {
+    cookie,
+    headers: {
+      ...LIVE_BROWSER_HEADERS,
+      ...(await liveSignHeaders(safeCategory)),
+    },
+  })
+  let payload = null
+  try {
+    payload = JSON.parse(res.body)
+  } catch {
+    payload = null
+  }
+  const feeds = payload?.data?.feeds || payload?.feeds || []
+  const rooms = (Array.isArray(feeds) ? feeds : []).map(normalizeLiveRoom).filter(Boolean)
+  const nextCursor = rooms.length ? rooms[rooms.length - 1].cursorScore : ''
+  return {
+    fetchedAt: new Date().toISOString(),
+    rooms,
+    cursor: nextCursor,
+    hasMore: Boolean(nextCursor) && rooms.length > 0,
+    upstreamStatus: res.status,
+    category: safeCategory,
   }
 }
 

@@ -8,9 +8,20 @@ export default defineConfig({
   base: './',
   plugins: [react(), xhsDataServer()],
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      {
+        find: 'react-dom-original',
+        replacement: fileURLToPath(new URL('./node_modules/react-dom/index.js', import.meta.url)),
+      },
+      {
+        find: /^react-dom$/,
+        replacement: fileURLToPath(new URL('./src/shims/react-dom.ts', import.meta.url)),
+      },
+      {
+        find: '@',
+        replacement: fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    ],
   },
   server: {
     host: true,

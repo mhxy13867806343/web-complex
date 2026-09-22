@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Toast } from './Toast'
+import { Toast } from '@nutui/nutui-react'
 
 interface Props {
   src: string
@@ -24,7 +24,10 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
-  const [playbackRate, setPlaybackRate] = useState(1.0)
+  const [volume, setVolume] = useState(1)
+  const [playbackRate, setPlaybackRate] = useState(1)
+  const [rateOpen, setRateOpen] = useState(false)
+  const [volumeOpen, setVolumeOpen] = useState(false)
   const [isLongPressing, setIsLongPressing] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -34,6 +37,9 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
   const longPressTimer = useRef<number | null>(null)
   const lastTapTime = useRef(0)
   const isDraggingProgress = useRef(false)
+  const menuOpenRef = useRef(false)
+
+  const RATES = [0.75, 1, 1.25, 1.5, 2]
 
   // 自动隐藏控制栏
   const resetHideTimer = useCallback(() => {
@@ -41,7 +47,7 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
     if (hideControlsTimer.current) {
       window.clearTimeout(hideControlsTimer.current)
     }
-    if (isPlaying && !isDraggingProgress.current) {
+    if (isPlaying && !isDraggingProgress.current && !menuOpenRef.current) {
       hideControlsTimer.current = window.setTimeout(() => {
         setShowControls(false)
       }, 2500)
@@ -71,28 +77,40 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
     }
   }, [])
 
-  // 静音 / 有声切换
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const closeMenus = () => {
+    menuOpenRef.current = false
+    setRateOpen(false)
+    setVolumeOpen(false)
+  }
+
+  const openMenu = (which: 'rate' | 'volume') => {
+    const nextRate = which === 'rate' ? !rateOpen : false
+    const nextVolume = which === 'volume' ? !volumeOpen : false
+    menuOpenRef.current = nextRate || nextVolume
+    setRateOpen(nextRate)
+    setVolumeOpen(nextVolume)
+    setShowControls(true)
+    if (hideControlsTimer.current) window.clearTimeout(hideControlsTimer.current)
+  }
+
+  const selectRate = (rate: number) => {
     const v = videoRef.current
     if (!v) return
-    v.muted = !v.muted
-    setIsMuted(v.muted)
+    v.playbackRate = rate
+    setPlaybackRate(rate)
+    closeMenus()
+    Toast.show({ content: `${rate}x 倍速播放`, duration: 1 })
     resetHideTimer()
   }
 
-  // 倍速循环切换：1.0x -> 1.25x -> 1.5x -> 2.0x -> 1.0x
-  const cyclePlaybackRate = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const selectVolume = (next: number) => {
     const v = videoRef.current
     if (!v) return
-    const rates = [1.0, 1.25, 1.5, 2.0]
-    const currentIdx = rates.indexOf(playbackRate)
-    const nextRate = rates[(currentIdx + 1) % rates.length]
-    v.playbackRate = nextRate
-    setPlaybackRate(nextRate)
-    Toast.show({ content: `${nextRate}x 倍速播放`, duration: 1 })
-    resetHideTimer()
+    const value = Math.min(1, Math.max(0, next))
+    v.volume = value
+    v.muted = value === 0
+    setVolume(value)
+    setIsMuted(value === 0)
   }
 
   // 全屏切换
@@ -133,6 +151,11 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
   // 处理单击 / 双击仲裁
   const handleVideoAreaClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (menuOpenRef.current) {
+      closeMenus()
+      resetHideTimer()
+      return
+    }
     const now = Date.now()
     if (now - lastTapTime.current < 280) {
       // 双击：触发红心点赞
@@ -239,8 +262,9 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
         ref={videoRef}
         className="custom-video-core"
         src={src}
-        poster={poster}
+        poster={poster || undefined}
         title={title}
+        controls={false}
         autoPlay
         playsInline
         loop
@@ -348,37 +372,82 @@ export default function CustomVideoPlayer({ src, poster, title, onLike }: Props)
           </div>
 
           <div className="video-ctrl-right">
-            {/* 倍速按钮 */}
-            <button
-              type="button"
-              className="video-ctrl-btn video-rate-btn"
-              onClick={cyclePlaybackRate}
-              title="切换倍速"
-            >
-              {playbackRate === 1.0 ? '倍速' : `${playbackRate}x`}
-            </button>
-
-            {/* 静音 / 音量 */}
-            <button
-              type="button"
-              className="video-ctrl-btn"
-              onClick={toggleMute}
-              aria-label={isMuted ? '开启声音' : '静音'}
-            >
-              {isMuted ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-                  <line x1="23" y1="9" x2="17" y2="15" />
-                  <line x1="17" y1="9" x2="23" y2="15" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                </svg>
+            <div className="video-pop-anchor">
+              {rateOpen && (
+                <div className="video-pop-menu" onClick={(e) => e.stopPropagation()}>
+                  {RATES.map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      className={`video-pop-item${playbackRate === rate ? ' active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        selectRate(rate)
+                      }}
+                    >
+                      {`${rate}x`}
+                    </button>
+                  ))}
+                </div>
               )}
-            </button>
+              <button
+                type="button"
+                className="video-ctrl-btn video-rate-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openMenu('rate')
+                }}
+                title="选择倍速"
+                aria-label="选择倍速"
+                aria-expanded={rateOpen}
+              >
+                {playbackRate === 1 ? '倍速' : `${playbackRate}x`}
+              </button>
+            </div>
+
+            <div className="video-pop-anchor">
+              {volumeOpen && (
+                <div className="video-pop-menu video-volume-menu" onClick={(e) => e.stopPropagation()}>
+                  <span className="video-volume-value">{Math.round((isMuted ? 0 : volume) * 100)}</span>
+                  <input
+                    type="range"
+                    className="video-volume-slider"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={isMuted ? 0 : volume}
+                    aria-label="音量"
+                    onChange={(e) => selectVolume(Number(e.target.value))}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                className="video-ctrl-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openMenu('volume')
+                }}
+                title="选择音量"
+                aria-label={isMuted ? '音量，当前静音' : '选择音量'}
+                aria-expanded={volumeOpen}
+              >
+                {isMuted || volume === 0 ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    {volume > 0.5 && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />}
+                  </svg>
+                )}
+              </button>
+            </div>
 
             {/* 全屏 */}
             <button

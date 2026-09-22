@@ -2,7 +2,7 @@
 
 基于 **React 19 + TypeScript + Vite + NutUI-React** 的移动端 H5，1:1 还原小红书「发现」页的信息流体验。
 
-> **只做「发现」页。** 首页 / 购物 / 消息 / 我的都需要登录态才有真实数据，与其摆假数据占位，不如不做。
+> **发现、RED、直播。** 购物 / 消息 / 我的需要登录态才有真实数据，与其摆假数据占位，不如不做。
 >
 > **数据全部实时抓取，没有任何静态快照。** 频道分类和笔记都通过运行时的 `/api/xhs/*` 接口现抓，
 > 所以**刷新页面 = 拿到新数据**。抓取逻辑见 `scripts/xhs-client.mjs` 与 `scripts/vite-xhs-data.mjs`。
@@ -162,10 +162,18 @@ xiaohongshu/
 - **💻 本地开发预览**：`npm run dev` → 终端打印 `http://localhost:5173/`。
 - **💻 本地生产预览**：`npm run build && npm run start` → `http://localhost:5173/`。
 
+## 页面
+
+底栏三个入口：发现 `/`、RED `/red_video`、直播 `/livelist`。
+
+- **RED**：瀑布流和上下滑两种布局，切回上下滑会停在上次那条。
+- **直播**：分类 0–6（全部、游戏、才艺颜值、生活分享、兴趣手工、科技财经、运动户外），地址栏和 `/api/xhs/live` 使用 squarefeed 的查询串。卡片字段来自 `live.t_room_info` / `t_live_host_info`，房间号用 `room_id_str`。底栏「直播」只留文字，不显示图标。
+
 ## 已知限制（待处理）
 
+- **直播签名按 URL 现算**：`x-s` / `x-s-common` / `x-t` 不在 `/api/sec/v1/scripting` 或 `/api/p/pj` 的响应里。一组签名只对当时那条 squarefeed 地址有效，换分类会得到 406，列表为空。Cookie 放在已忽略的 `.xhs-cookie`，签名放在已忽略的 `.xhs-live-sign.json`。
+- **GitHub Pages 没有直播数据**：Pages 是纯静态包，没有 `/api/xhs`。直播和实时抓取要看 Node 服务 [https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)。
 - **评论数不展示**：匿名 feed 的 `interactInfo` 只有 `liked` / `likedCount`，没有评论数字段（需登录态接口），按需求暂不显示。
 - **点赞 / 分享已移除**：按需求，卡片与详情页都不展示点赞数、不提供分享入口，详情页仅保留「收藏」。
 - **风控间歇性 302**：匿名访问偶发被拦，已用「重试 + 内存/磁盘缓存」兜底，不会白屏；彻底解决需配登录 Cookie。
-- **仅做「发现」页**：关注 / 附近 / 搜索 / 笔记正文 / 商品 / 私信等均需登录态，未做（摆假数据不如不做）。
 - **视频频道**：`homefeed.video` 才有数据（`homefeed.video_v3` 恒返回 0 条），已在 `xhs-client.mjs` 的 `CHANNEL_ID_FIX` 修正。

@@ -77,9 +77,31 @@ button {
     border-radius: 40px;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   }
+
+  /* 桌面确认进入移动端后：去掉外壳，按手机页面铺满视口高度 */
+  html.xhs-mobile-page body {
+    display: block;
+    padding: 0;
+    background: var(--xhs-bg);
+  }
+
+  html.xhs-mobile-page .phone {
+    height: 100vh;
+    height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 /* ---------- 内容滚动区 ---------- */
+.tab-pages {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .page-body {
   flex: 1;
   overflow-y: auto;
@@ -87,6 +109,26 @@ button {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   background: var(--xhs-bg);
+}
+
+.tab-pages > .page-body {
+  position: absolute;
+  inset: 0;
+  flex: none;
+  height: auto;
+}
+
+.app-tabbar.nut-tabbar {
+  position: relative;
+  flex: none;
+  width: 100%;
+  z-index: 40;
+  background: #fff;
+  border-top: 0.5px solid #eee;
+}
+
+.app-tabbar .nut-tabbar-item:has(.live-tab-icon) .nut-badge {
+  display: none;
 }
 
 .page-body::-webkit-scrollbar {

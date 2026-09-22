@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, Home, Loading, Share } from '@nutui/icons-react'
 import type { Note, UserProfileData } from '../data'
 import { fetchUserProfileApi } from '../data/api'
-import { Toast } from './Toast'
+import { Toast } from '@nutui/nutui-react'
+import { beginRequestToast, endRequestToast } from '../utils/loadingToast'
 import NoteCard from './NoteCard'
 import { navigate, getExploreUrl } from '../router'
 
@@ -26,15 +27,21 @@ export default function UserPage({ userId, knownNotes = [], onBack, onGoHome, on
     if (!userId) return
     const ac = new AbortController()
     setLoading(true)
+    const toastId = beginRequestToast('正在加载')
 
     fetchUserProfileApi(userId, undefined, knownNotes, ac.signal)
       .then((data) => {
         setProfile(data)
         setLoading(false)
+        endRequestToast(toastId)
       })
       .catch((err) => {
-        if (err?.name === 'AbortError') return
+        if (err?.name === 'AbortError') {
+          endRequestToast(toastId)
+          return
+        }
         setLoading(false)
+        endRequestToast(toastId, { content: '加载失败，请稍后重试', duration: 1.5 })
       })
 
     return () => ac.abort()

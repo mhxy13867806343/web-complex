@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { Author } from './data'
+import { dismissRequestToast } from './utils/loadingToast'
 
 export interface RouteInfo {
   path: string
-  name: 'home' | 'user' | 'note' | 'search'
+  name: 'home' | 'user' | 'note' | 'search' | 'video' | 'live'
   userId?: string
   noteId?: string
   author?: Author
@@ -119,6 +120,26 @@ export function parseRoute(rawUrl?: string): RouteInfo {
         noteId,
         query,
       }
+    }
+
+    // 小红书视频页 /red_video，笔记详情仍走 /red_video/:noteId
+    const redNoteMatch = pathname.match(/^\/red_video\/([^/?#]+)/)
+    if (redNoteMatch) {
+      const noteId = decodeURIComponent(redNoteMatch[1])
+      return {
+        path: `/red_video/${noteId}`,
+        name: 'note',
+        noteId,
+        query,
+      }
+    }
+
+    if (pathname === '/red_video' || pathname === '/red_video/') {
+      return { path: '/red_video', name: 'video', query }
+    }
+
+    if (pathname === '/livelist' || pathname.startsWith('/livestream')) {
+      return { path: pathname, name: 'live', query }
     }
 
     // 匹配搜索结果页路由：/search_result/、/search_result 或 /search
@@ -250,6 +271,7 @@ export function useRoute(): RouteInfo {
 
   useEffect(() => {
     const handleRouteChange = () => {
+      dismissRequestToast()
       setRoute(parseRoute())
     }
 

@@ -3,7 +3,10 @@ import Explore from './components/Explore'
 import UserPage from './components/UserPage'
 import NoteDetail from './components/NoteDetail'
 import SearchResult from './components/SearchResult'
-import { ToastHost } from './components/Toast'
+import MobileEnvDialog from './components/MobileEnvDialog'
+import BottomTabBar from './components/BottomTabBar'
+import RedVideo from './components/RedVideo'
+import LiveList from './components/LiveList'
 import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl } from './router'
 
 /**
@@ -17,6 +20,8 @@ export default function App() {
   const route = useRoute()
   const [searchMounted, setSearchMounted] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState('vlog')
+  const [videoMounted, setVideoMounted] = useState(false)
+  const [liveMounted, setLiveMounted] = useState(false)
 
   useEffect(() => {
     if (route.name === 'search') {
@@ -28,23 +33,55 @@ export default function App() {
       // 彻底返回首页时卸载搜索结果页
       setSearchMounted(false)
     }
+    if (route.name === 'video') setVideoMounted(true)
+    if (route.name === 'live') setLiveMounted(true)
   }, [route.name, route.keyword])
+
+  const showTab = route.name === 'home' || route.name === 'video' || route.name === 'live'
 
   return (
     <div className="phone">
       {/* 注意：这个 id 是必需的 —— NutUI 的 InfiniteLoading 用 document.getElementById(target) 找滚动容器，
           传类名选择器（'.page-body'）会找不到，它会静默回退到 window，导致上拉加载永远不触发。 */}
       {/* 发现页保持常驻挂载：避免查看博主主页或笔记详情返回后数据重置、二次加载或空状态闪烁 */}
+      <div className="tab-pages">
       <div
         className="page-body"
         id="page-body"
         style={{
-          display: 'block',
           visibility: route.name === 'home' ? 'visible' : 'hidden',
           pointerEvents: route.name === 'home' ? 'auto' : 'none',
+          zIndex: route.name === 'home' ? 1 : 0,
         }}
       >
-        <Explore />
+        <Explore active={route.name === 'home'} />
+      </div>
+      {videoMounted && (
+        <div
+          className="page-body"
+          id="red-page-body"
+          style={{
+            visibility: route.name === 'video' ? 'visible' : 'hidden',
+            pointerEvents: route.name === 'video' ? 'auto' : 'none',
+            zIndex: route.name === 'video' ? 1 : 0,
+          }}
+        >
+          <RedVideo />
+        </div>
+      )}
+      {liveMounted && (
+        <div
+          className="page-body"
+          id="live-page-body"
+          style={{
+            visibility: route.name === 'live' ? 'visible' : 'hidden',
+            pointerEvents: route.name === 'live' ? 'auto' : 'none',
+            zIndex: route.name === 'live' ? 1 : 0,
+          }}
+        >
+          <LiveList active={route.name === 'live'} />
+        </div>
+      )}
       </div>
 
       {/* 搜索结果页同样保持常驻缓存：从搜索页进入博主主页或笔记详情时保持挂载，返回后分类Tab（如用户Tab）、子标签、已加载笔记和滚动位置完好如初 */}
@@ -117,7 +154,8 @@ export default function App() {
           }}
         />
       )}
-      <ToastHost />
+      {showTab && <BottomTabBar routeName={route.name} />}
+      <MobileEnvDialog />
     </div>
   )
 }

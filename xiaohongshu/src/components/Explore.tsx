@@ -7,8 +7,9 @@ import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute } from '../router'
 import ChannelChips from './ChannelChips'
-import { Toast } from './Toast'
+import { beginRequestToast, endRequestToast } from '../utils/loadingToast'
 import Waterfall from './Waterfall'
+import ConfirmModal from './ConfirmModal'
 
 const RECOMMEND = '推荐'
 
@@ -72,7 +73,12 @@ function mergeNotes(head: Note[], tail: Note[]): Note[] {
   return out
 }
 
-export default function Explore() {
+function isHomePath() {
+  const path = window.location.pathname
+  return path === '/' || path === ''
+}
+
+export default function Explore({ active = true }: { active?: boolean }) {
   const [channels, setChannels] = useState<string[]>(INITIAL_CHANNELS)
   const [channel, setChannel] = useState<string>(getInitialChannel)
   /** 每个流抓到的笔记列表 */
@@ -96,9 +102,11 @@ export default function Explore() {
   const [hotSearches, setHotSearches] = useState<HotSearchItem[]>([])
   const { history, addHistory, removeItem, clearHistory } = useSearchHistory()
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'remove'; item?: string } | null>(null)
 
-  // 动态请求热搜词接口
+  // 动态请求热搜词接口（只在首页）
   useEffect(() => {
+    if (!active) return
     const ac = new AbortController()
     fetchHotSearchesApi('', ac.signal)
       .then((res) => {
@@ -110,7 +118,7 @@ export default function Explore() {
         /* handled */
       })
     return () => ac.abort()
-  }, [])
+  }, [active])
 
   useEffect(() => {
     const handleDocClick = (e: MouseEvent) => {
@@ -176,6 +184,9 @@ export default function Explore() {
       setLoading(true)
       const ac = new AbortController()
       abortRef.current = ac
+      const toastId = feedsRef.current[ch]?.length
+        ? 0
+        : beginRequestToast(mode === 'more' ? '正在加载更多' : '正在加载')
       try {
         const r = await fetchFeed(ch, { signal: ac.signal, more: mode === 'more' })
         if (r.notes.length) {
@@ -187,29 +198,36 @@ export default function Explore() {
           if (mode === 'more' && added === 0) {
             // 没有更多新笔记可追加了（已全部加载完毕），标记到底并停止重复触发加载
             setBottom((prev) => ({ ...prev, [ch]: true }))
-            if (!silent) {
-              Toast.show({ content: '已经到底了', duration: 1.5 })
-            }
+            endRequestToast(toastId, silent ? undefined : { content: '已经到底了', duration: 1.5 })
             return 0
           }
           // 重新有新数据了，撤销「到底」标记
           setBottom((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
           setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
-          if (added > 0 && !silent) {
-            Toast.show({
-              content: mode === 'more' ? `已加载 ${added} 条新笔记` : `已刷新 ${added} 条笔记`,
-              duration: 1.5,
-            })
-          }
+          endRequestToast(
+            toastId,
+            added > 0 && !silent
+              ? {
+                  content: mode === 'more' ? `已加载 ${added} 条新笔记` : `已刷新 ${added} 条笔记`,
+                  duration: 1.5,
+                }
+              : undefined
+          )
           return added
         }
         if (mode === 'more') setBottom((prev) => ({ ...prev, [ch]: true }))
-        if (!silent) Toast.show({ content: '已经到底了', duration: 1.5 })
+        endRequestToast(toastId, silent ? undefined : { content: '已经到底了', duration: 1.5 })
         return 0
       } catch (e) {
-        if ((e as Error).name === 'AbortError') return 0
+        if ((e as Error).name === 'AbortError') {
+          endRequestToast(toastId)
+          return 0
+        }
         setDead((prev) => ({ ...prev, [ch]: true }))
-        if (!silent) Toast.show({ content: `加载失败：${(e as Error).message}`, duration: 2.4 })
+        endRequestToast(toastId, {
+          content: silent ? '加载失败，请稍后重试' : `加载失败：${(e as Error).message}`,
+          duration: 2.4,
+        })
         return 0
       } finally {
         loadingRef.current = false
@@ -223,13 +241,7 @@ export default function Explore() {
   useEffect(() => {
     const handleUrlChange = () => {
       // 如果当前处于博主主页或笔记详情等非探索页路由，绝对不触碰或重置探索页的频道状态
-      if (
-        window.location.pathname.startsWith('/user') ||
-        window.location.pathname.startsWith('/explore/') ||
-        window.location.pathname.startsWith('/note')
-      ) {
-        return
-      }
+      if (!isHomePath()) return
       const ch = getInitialChannel()
       setChannel((prev) => {
         if (prev === ch) {
@@ -261,8 +273,9 @@ export default function Explore() {
     }
   }, [load])
 
-  // 分类实时拉取
+  // 分类实时拉取（只在首页）
   useEffect(() => {
+    if (!active) return
     const ac = new AbortController()
     fetchChannels(ac.signal)
       .then((r) => {
@@ -273,15 +286,12 @@ export default function Explore() {
         /* 拉不到就只有「推荐」 */
       })
     return () => ac.abort()
-  }, [])
+  }, [active])
 
   // 首屏 + 每次切频道发起 Ajax 请求（已有缓存数据时直接复用，杜绝返回或切回频道时重复发请求）
   useEffect(() => {
-    if (
-      window.location.pathname.startsWith('/user') ||
-      window.location.pathname.startsWith('/explore/') ||
-      window.location.pathname.startsWith('/note')
-    ) {
+    if (!active) {
+      abortRef.current?.abort()
       return
     }
     if (feedsRef.current[channel]?.length) {
@@ -289,7 +299,7 @@ export default function Explore() {
     }
     document.querySelector(SCROLLER)?.scrollTo({ top: 0 })
     void load(channel, true, 'refresh')
-  }, [channel, load])
+  }, [channel, load, active])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -297,8 +307,7 @@ export default function Explore() {
   const { distance, pulling, refreshing } = usePullToRefresh(
     SCROLLER,
     async () => {
-      const n = await load(channel, false, 'refresh')
-      if (n) Toast.show({ content: `已刷新 ${n} 条最新笔记`, duration: 1.6 })
+      await load(channel, false, 'refresh')
     },
     true
   )
@@ -320,7 +329,7 @@ export default function Explore() {
   useEffect(() => {
     const el = document.getElementById(SCROLLER_ID)
     const checkAndLoad = () => {
-      if (loadingRef.current || bottom[channel] || dead[channel]) return
+      if (!isHomePath() || loadingRef.current || bottom[channel] || dead[channel]) return
 
       let distanceToBottom = 9999
       if (el && el.scrollHeight > el.clientHeight) {
@@ -464,7 +473,7 @@ export default function Explore() {
                       className="explore-suggest-clear-btn"
                       onClick={(e) => {
                         e.stopPropagation()
-                        clearHistory()
+                        setConfirmAction({ type: 'clear' })
                       }}
                       title="清空历史记录"
                     >
@@ -495,7 +504,7 @@ export default function Explore() {
                           className="explore-history-del"
                           onClick={(e) => {
                             e.stopPropagation()
-                            removeItem(item)
+                            setConfirmAction({ type: 'remove', item })
                           }}
                           title="删除"
                         >
@@ -622,6 +631,19 @@ export default function Explore() {
         target={SCROLLER_ID}
         threshold={240}
         duration={500}
+      />
+
+      <ConfirmModal
+        visible={!!confirmAction}
+        title="提示"
+        content={confirmAction?.type === 'clear' ? '确定要清空所有历史记录吗？' : `确定要删除"${confirmAction?.item}"吗？`}
+        theme="light"
+        onConfirm={() => {
+          if (confirmAction?.type === 'clear') clearHistory()
+          else if (confirmAction?.item) removeItem(confirmAction.item)
+          setConfirmAction(null)
+        }}
+        onCancel={() => setConfirmAction(null)}
       />
     </div>
   )

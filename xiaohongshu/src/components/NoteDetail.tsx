@@ -11,7 +11,8 @@ import {
 import type { CommentItem, Note, NoteDetailData, Author } from '../data'
 import { fetchNoteComments, fetchNoteDetail } from '../data/api'
 import { openUserProfileRoute, openSearchResultRoute, navigate, getExploreUrl } from '../router'
-import { Toast } from './Toast'
+import { Toast } from '@nutui/nutui-react'
+import { beginRequestToast, endRequestToast } from '../utils/loadingToast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
 interface Props {
@@ -126,13 +127,21 @@ export default function NoteDetail({
 
     setCurrentImgIndex(0)
     setLoadingDetail(true)
+    const toastId = beginRequestToast('正在加载')
 
     const ac = new AbortController()
 
     // 抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
+    let emptyDetail = false
     fetchNoteDetail(baseId, note?.noteUrl, note || undefined, ac.signal)
       .then((detailRes) => {
         setDetail(detailRes)
+        const hasImages = (detailRes.imageList || []).some((src) => Boolean(src && src.trim()))
+        emptyDetail =
+          !detailRes.videoUrl &&
+          !hasImages &&
+          !(detailRes.desc || '').trim() &&
+          !(detailRes.title || '').trim()
         const realTitle = detailRes.title || note?.title || ''
         const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : note?.tags || []
         const realCount = detailRes.interactInfo?.commentCount || ''
@@ -142,8 +151,15 @@ export default function NoteDetail({
         setComments(commentsRes.comments)
         setCommentsCount(commentsRes.count || commentsRes.comments.length)
       })
-      .catch(() => {
-        /* 保持优雅降级 */
+      .then(() => {
+        endRequestToast(toastId, emptyDetail ? { content: '笔记内容为空', duration: 1.8 } : undefined)
+      })
+      .catch((err) => {
+        if ((err as Error)?.name === 'AbortError') {
+          endRequestToast(toastId)
+          return
+        }
+        endRequestToast(toastId, { content: '加载失败，请稍后重试', duration: 1.5 })
       })
       .finally(() => {
         setLoadingDetail(false)
@@ -153,7 +169,10 @@ export default function NoteDetail({
   }, [effectiveId])
 
   const isVideo = currentNote ? (currentNote.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl) : false
-  const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (currentNote ? [currentNote.cover] : [])
+  const images = (
+    (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (currentNote ? [currentNote.cover] : [])
+  ).filter((src) => Boolean(src && src.trim()))
+  const mediaEmpty = !loadingDetail && !detail?.videoUrl && images.length === 0
   const currentLikes = parseCount(detail?.interactInfo?.likedCount || currentNote?.likes, 0)
   const currentCollects = parseCount(detail?.interactInfo?.collectedCount || '0', collected ? 1 : 0)
 
@@ -332,7 +351,12 @@ export default function NoteDetail({
         >
           {/* 顶部媒体区：视频直接播放 / 图集多图轮播（含 2/5、小圆点、自动滚动） */}
           <div className="detail-media-container">
-            {isVideo && detail?.videoUrl ? (
+            {mediaEmpty ? (
+              <div className="detail-cover-fallback">
+                <span>🍠</span>
+                <em>笔记内容为空</em>
+              </div>
+            ) : isVideo && detail?.videoUrl ? (
               <div className="detail-video-wrap">
                 <CustomVideoPlayer
                   src={getVideoSrc(detail.videoUrl)}

@@ -30,12 +30,20 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  * 用 curl 拿页面，同时把状态码 / Location 带回来，便于判断是不是被踢到登录页。
  * @returns {Promise<{status:number, body:string, location:string}>}
  */
-export async function httpGet(url, { cookie = '' } = {}) {
+export async function httpGet(url, { cookie = '', headers = {} } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'xhs-'))
   const bodyFile = path.join(dir, 'body.html')
   const headFile = path.join(dir, 'head.txt')
+  const headerMap = {
+    'User-Agent': UA,
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9',
+    Referer: 'https://www.xiaohongshu.com/',
+    ...headers,
+  }
   const args = [
     '-s',
+    '-g',
     '--max-time',
     '30',
     '-D',
@@ -44,15 +52,10 @@ export async function httpGet(url, { cookie = '' } = {}) {
     bodyFile,
     '-w',
     '%{http_code}',
-    '-H',
-    `User-Agent: ${UA}`,
-    '-H',
-    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    '-H',
-    'Accept-Language: zh-CN,zh;q=0.9',
-    '-H',
-    'Referer: https://www.xiaohongshu.com/',
   ]
+  for (const [key, value] of Object.entries(headerMap)) {
+    if (value) args.push('-H', `${key}: ${value}`)
+  }
   if (cookie) args.push('-H', `Cookie: ${cookie}`)
   args.push(url)
 

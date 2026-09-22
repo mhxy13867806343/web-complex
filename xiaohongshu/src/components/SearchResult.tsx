@@ -5,10 +5,12 @@ import type { Note } from '../data'
 import { fetchSearchResultsApi, fetchHotSearchesApi, type SearchResultData, type HotSearchItem } from '../data/api'
 import { useSearchHistory } from '../utils/searchHistory'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
-import { Toast } from './Toast'
+import { Toast } from '@nutui/nutui-react'
+import { beginRequestToast, endRequestToast } from '../utils/loadingToast'
 import Waterfall from './Waterfall'
 import ChannelChips from './ChannelChips'
 import { openSearchResultRoute } from '../router'
+import ConfirmModal from './ConfirmModal'
 
 const SCROLLER_SELECTOR = '#search-result-body'
 const SCROLLER_ID = 'search-result-body'
@@ -68,6 +70,7 @@ export default function SearchResult({
   const hasMoreRef = useRef(true)
   const pageRef = useRef(1)
   const abortRef = useRef<AbortController | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ type: 'clear' | 'remove'; item?: string } | null>(null)
 
   useEffect(() => {
     loadingRef.current = loading
@@ -138,6 +141,7 @@ export default function SearchResult({
       abortRef.current = ac
       setLoading(true)
       loadingRef.current = true
+      const toastId = beginRequestToast('正在搜索')
       try {
         const res = await fetchSearchResultsApi(
           kw,
@@ -161,12 +165,16 @@ export default function SearchResult({
         setHasMore(more)
         hasMoreRef.current = more
         document.getElementById(SCROLLER_ID)?.scrollTo({ top: 0 })
+        endRequestToast(toastId)
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           setData(null)
           setNotes([])
           setHasMore(false)
           hasMoreRef.current = false
+          endRequestToast(toastId, { content: '搜索失败，请稍后重试', duration: 1.5 })
+        } else {
+          endRequestToast(toastId)
         }
       } finally {
         setLoading(false)
@@ -185,6 +193,7 @@ export default function SearchResult({
 
   // 下拉刷新
   const handleRefresh = useCallback(async () => {
+    const toastId = beginRequestToast('正在刷新')
     try {
       const res = await fetchSearchResultsApi(
         currentKeyword,
@@ -206,9 +215,9 @@ export default function SearchResult({
       const more = res.hasMore ?? false
       setHasMore(more)
       hasMoreRef.current = more
-      Toast.show({ content: '已刷新最新搜索笔记', duration: 1.5 })
+      endRequestToast(toastId, { content: '已刷新最新搜索笔记', duration: 1.5 })
     } catch {
-      Toast.show({ content: '刷新失败，请稍后重试', duration: 1.5 })
+      endRequestToast(toastId, { content: '刷新失败，请稍后重试', duration: 1.5 })
     }
   }, [currentKeyword, sort, noteType, activeSubTag, timeRange, searchScope, distance])
 
@@ -224,6 +233,7 @@ export default function SearchResult({
     loadingMoreRef.current = true
     setLoadingMore(true)
     const nextPage = pageRef.current + 1
+    const toastId = beginRequestToast('正在加载更多')
     try {
       const res = await fetchSearchResultsApi(
         currentKeyword,
@@ -249,8 +259,9 @@ export default function SearchResult({
         setHasMore(false)
         hasMoreRef.current = false
       }
+      endRequestToast(toastId)
     } catch {
-      // ignore
+      endRequestToast(toastId, { content: '加载失败，请稍后重试', duration: 1.5 })
     } finally {
       loadingMoreRef.current = false
       setLoadingMore(false)
@@ -290,7 +301,10 @@ export default function SearchResult({
   // 执行搜索
   const doSearch = (newKw?: string) => {
     const targetKw = (newKw ?? keywordInput).trim()
-    if (!targetKw) return
+    if (!targetKw) {
+      Toast.show({ content: '请输入搜索内容', duration: 1.5 })
+      return
+    }
     addHistory(targetKw)
     setShowSuggest(false)
     setKeywordInput(targetKw)
@@ -446,7 +460,7 @@ export default function SearchResult({
                     className="search-suggest-clear-btn"
                     onClick={(e) => {
                       e.stopPropagation()
-                      clearHistory()
+                      setConfirmAction({ type: 'clear' })
                     }}
                     title="清空历史记录"
                   >
@@ -477,7 +491,7 @@ export default function SearchResult({
                         className="search-history-chip-del"
                         onClick={(e) => {
                           e.stopPropagation()
-                          removeItem(item)
+                          setConfirmAction({ type: 'remove', item })
                         }}
                         title="删除"
                       >
@@ -856,6 +870,19 @@ export default function SearchResult({
         target={SCROLLER_ID}
         threshold={240}
         duration={500}
+      />
+
+      <ConfirmModal
+        visible={!!confirmAction}
+        title="提示"
+        content={confirmAction?.type === 'clear' ? '确定要清空所有历史记录吗？' : `确定要删除"${confirmAction?.item}"吗？`}
+        theme="dark"
+        onConfirm={() => {
+          if (confirmAction?.type === 'clear') clearHistory()
+          else if (confirmAction?.item) removeItem(confirmAction.item)
+          setConfirmAction(null)
+        }}
+        onCancel={() => setConfirmAction(null)}
       />
     </div>
   )

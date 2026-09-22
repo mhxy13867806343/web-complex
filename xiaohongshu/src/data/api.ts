@@ -579,3 +579,37 @@ export async function fetchSearchResultsApi(
   }
 }
 
+export interface LiveRoom {
+  roomId: string
+  title: string
+  cover: string
+  nickname: string
+  avatar: string
+  viewers: string
+  cursorScore: string
+}
+
+/** 与网页端 squarefeed 一致的查询串 */
+export function liveListQuery(cursor = '0', category = '0') {
+  const extra = '%7B%22image_formats%22:[%22jpg%22,%22webp%22,%22avif%22]%7D'
+  return [
+    `cursor_score=${cursor || '0'}`,
+    'source=13',
+    `category=${category}`,
+    'pre_source=',
+    `extra_info=${extra}`,
+    'size=27',
+  ].join('&')
+}
+
+export async function fetchLiveList(cursor = '0', category = '0', signal?: AbortSignal) {
+  const res = await fetch(`/api/xhs/live?${liveListQuery(cursor, category)}`, { signal, headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error('直播加载失败')
+  return (await res.json()) as {
+    rooms: LiveRoom[]
+    cursor: string
+    hasMore: boolean
+    upstreamStatus: number
+  }
+}
+
