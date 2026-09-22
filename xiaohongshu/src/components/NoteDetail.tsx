@@ -11,6 +11,7 @@ import {
 import type { CommentItem, Note, NoteDetailData } from '../data'
 import { fetchNoteComments, fetchNoteDetail } from '../data/api'
 import { Toast } from './Toast'
+import CustomVideoPlayer from './CustomVideoPlayer'
 
 interface Props {
   note: Note | null
@@ -40,7 +41,6 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [currentImgIndex, setCurrentImgIndex] = useState(0)
-  const [following, setFollowing] = useState(false)
 
   // 评论相关（只展示，不可点击，不可回复）
   const [comments, setComments] = useState<CommentItem[]>([])
@@ -96,12 +96,10 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
       setComments([])
       setCommentsCount(0)
       setCurrentImgIndex(0)
-      setFollowing(false)
       return
     }
 
     setCurrentImgIndex(0)
-    setFollowing(false)
     setLoadingDetail(true)
 
     const ac = new AbortController()
@@ -293,13 +291,10 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
           <div className="detail-media-container">
             {isVideo && detail?.videoUrl ? (
               <div className="detail-video-wrap">
-                <video
-                  className="detail-video-player"
+                <CustomVideoPlayer
                   src={getVideoSrc(detail.videoUrl)}
                   poster={currentNote.cover}
-                  controls
-                  autoPlay
-                  playsInline
+                  title={currentNote.title}
                 />
               </div>
             ) : isVideo && !detail?.videoUrl ? (
@@ -449,15 +444,6 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
               />
             )}
             <span className="detail-author-name">{detail?.user?.name || currentNote.author.name}</span>
-            <button
-              className={`btn-follow${following ? ' following' : ''}`}
-              onClick={() => {
-                setFollowing(!following)
-                Toast.show({ content: !following ? '已关注作者' : '已取消关注', duration: 1.2 })
-              }}
-            >
-              {following ? '已关注' : '关注'}
-            </button>
           </div>
 
           {/* 真实评论区（完全还原截图视觉） */}
