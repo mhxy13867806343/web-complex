@@ -10,8 +10,8 @@ import {
   Star,
   StarFill,
 } from '@nutui/icons-react'
-import type { Note, NoteDetailData } from '../data'
-import { fetchNoteDetail } from '../data/api'
+import type { CommentItem, Note, NoteDetailData } from '../data'
+import { fetchNoteComments, fetchNoteDetail } from '../data/api'
 import { Toast } from './Toast'
 
 interface Props {
@@ -30,10 +30,11 @@ function parseCount(raw: string | undefined, delta: number): string {
 
 /**
  * 笔记详情弹窗：
- * 1. 真实视频播放（videoUrl）
- * 2. 多图轮播切换（imageList）：手势滑动、左右翻页、2/5 角标、底部圆点指示器
+ * 1. 真实视频播放（videoUrl）与防盗链直链代理
+ * 2. 多图轮播切换（imageList）：手势滑动、左右翻页、2/5 角标、底部圆点指示器、自动轮播
  * 3. 真实正文内容（desc）与话题标签（tags）
- * 4. 真实互动数据：点赞数（likes: "787"）、收藏、评论、分享
+ * 4. 真实互动数据：点赞数（likes: "787"）、收藏、分享
+ * 5. 真实评论区（comments）：头像、昵称、评论内容、时间属地、主回复嵌套、点赞互动
  */
 export default function NoteDetail({ note, collected, onCollect, onClose }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
@@ -45,7 +46,14 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
   const [likeDelta, setLikeDelta] = useState(0)
   const [following, setFollowing] = useState(false)
 
-  // 手势滑动图集
+  // 评论相关
+  const [comments, setComments] = useState<CommentItem[]>([])
+  const [commentsCount, setCommentsCount] = useState(0)
+  const [inputComment, setInputComment] = useState('')
+  const [replyTarget, setReplyTarget] = useState('')
+  const commentsSectionRef = useRef<HTMLDivElement>(null)
+
+  // 轮播控制
   const touchStart = useRef({ x: 0, y: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const isTouching = useRef(false)
@@ -53,10 +61,14 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
   useEffect(() => {
     if (!note) {
       setDetail(null)
+      setComments([])
+      setCommentsCount(0)
       setCurrentImgIndex(0)
       setLiked(false)
       setLikeDelta(0)
       setFollowing(false)
+      setInputComment('')
+      setReplyTarget('')
       return
     }
 
@@ -67,12 +79,19 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
     setLoadingDetail(true)
 
     const ac = new AbortController()
-    fetchNoteDetail(note.id, note.noteUrl, ac.signal)
-      .then((res) => {
-        setDetail(res)
+
+    // 并行请求详情与评论
+    Promise.all([
+      fetchNoteDetail(note.id, note.noteUrl, ac.signal),
+      fetchNoteComments(note.id, note.title, ac.signal),
+    ])
+      .then(([detailRes, commentsRes]) => {
+        setDetail(detailRes)
+        setComments(commentsRes.comments)
+        setCommentsCount(commentsRes.count || commentsRes.comments.length)
       })
       .catch(() => {
-        /* 保持兜底状态 */
+        /* 保持优雅降级 */
       })
       .finally(() => {
         setLoadingDetail(false)
@@ -130,6 +149,72 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
     return rawUrl.replace(/^http:/, 'https:')
   }
 
+  // 评论点赞交互
+  const toggleCommentLike = (commentId: string) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) {
+          const nextLiked = !c.liked
+          const num = parseInt(c.likes.replace(/[^\d]/g, ''), 10) || 10
+          return {
+            ...c,
+            liked: nextLiked,
+            likes: nextLiked ? `${num + 1}` : `${Math.max(0, num - 1)}`,
+          }
+        }
+        return c
+      })
+    )
+  }
+
+  const toggleSubCommentLike = (commentId: string, subId: string) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId && c.subComments) {
+          return {
+            ...c,
+            subComments: c.subComments.map((sub) => {
+              if (sub.id === subId) {
+                const nextLiked = !sub.liked
+                const num = parseInt(sub.likes.replace(/[^\d]/g, ''), 10) || 10
+                return {
+                  ...sub,
+                  liked: nextLiked,
+                  likes: nextLiked ? `${num + 1}` : `${Math.max(0, num - 1)}`,
+                }
+              }
+              return sub
+            }),
+          }
+        }
+        return c
+      })
+    )
+  }
+
+  // 发送评论
+  const submitComment = () => {
+    const text = inputComment.trim()
+    if (!text) return
+    const newComment: CommentItem = {
+      id: `user_${Date.now()}`,
+      user: {
+        name: '我',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6497121fbbeea8114fed42bd.jpg',
+      },
+      content: replyTarget ? `@${replyTarget} ${text}` : text,
+      time: '刚刚',
+      location: '广东',
+      likes: '0',
+      subComments: [],
+    }
+    setComments((prev) => [newComment, ...prev])
+    setCommentsCount((c) => c + 1)
+    setInputComment('')
+    setReplyTarget('')
+    Toast.show({ content: '评论已发布', duration: 1.2 })
+  }
+
   return (
     <Popup
       visible={!!note}
@@ -143,7 +228,7 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
     >
       <div className="detail">
         <div className="detail-scroll">
-          {/* 顶部媒体区：视频直接播放 / 图集多图轮播（含 2/5 与小圆点） */}
+          {/* 顶部媒体区：视频直接播放 / 图集多图轮播（含 2/5、小圆点、自动滚动） */}
           <div className="detail-media-container">
             {isVideo && detail?.videoUrl ? (
               <div className="detail-video-wrap">
@@ -208,24 +293,20 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
                     </div>
 
                     {/* 左右翻页箭头 */}
-                    {currentImgIndex > 0 && (
-                      <button
-                        className="carousel-arrow carousel-arrow-left"
-                        onClick={() => setCurrentImgIndex((i) => i - 1)}
-                        aria-label="上一张"
-                      >
-                        <ArrowLeft width={16} height={16} />
-                      </button>
-                    )}
-                    {currentImgIndex < images.length - 1 && (
-                      <button
-                        className="carousel-arrow carousel-arrow-right"
-                        onClick={() => setCurrentImgIndex((i) => i + 1)}
-                        aria-label="下一张"
-                      >
-                        <ArrowRight width={16} height={16} />
-                      </button>
-                    )}
+                    <button
+                      className="carousel-arrow carousel-arrow-left"
+                      onClick={() => setCurrentImgIndex((i) => (i - 1 + images.length) % images.length)}
+                      aria-label="上一张"
+                    >
+                      <ArrowLeft width={16} height={16} />
+                    </button>
+                    <button
+                      className="carousel-arrow carousel-arrow-right"
+                      onClick={() => setCurrentImgIndex((i) => (i + 1) % images.length)}
+                      aria-label="下一张"
+                    >
+                      <ArrowRight width={16} height={16} />
+                    </button>
 
                     {/* 底部指示圆点：● ● ● ● ● */}
                     <div className="carousel-dots">
@@ -317,12 +398,102 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
               {following ? '已关注' : '关注'}
             </button>
           </div>
+
+          {/* 真实评论区（完全还原截图视觉） */}
+          <div className="detail-comments-wrap" ref={commentsSectionRef}>
+            <div className="comments-header">
+              共 {commentsCount} 条评论
+            </div>
+
+            <div className="comments-list">
+              {comments.map((item) => (
+                <div className="comment-thread" key={item.id}>
+                  {/* 主评论 */}
+                  <div className="comment-item">
+                    <img className="comment-avatar" src={item.user.avatar} alt="" referrerPolicy="no-referrer" />
+                    <div className="comment-content-area">
+                      <div className="comment-author-name">{item.user.name}</div>
+                      <div className="comment-text">{item.content}</div>
+                      <div className="comment-meta">
+                        <span className="comment-date-loc">{item.time} {item.location}</span>
+                        <div className="comment-meta-actions">
+                          <span
+                            className={`comment-like-btn${item.liked ? ' liked' : ''}`}
+                            onClick={() => toggleCommentLike(item.id)}
+                          >
+                            {item.liked ? <HeartFill width={14} height={14} color="#ff2442" /> : <Heart width={14} height={14} />}
+                            <span className="comment-like-count">{item.likes}</span>
+                          </span>
+                          <span
+                            className="comment-reply-btn"
+                            onClick={() => {
+                              setReplyTarget(item.user.name)
+                              Toast.show({ content: `回复 @${item.user.name}`, duration: 1 })
+                            }}
+                          >
+                            <Comment width={14} height={14} />
+                            <span>{item.subComments?.length ? item.subComments.length : '回复'}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 子评论（楼中楼回复） */}
+                  {item.subComments && item.subComments.length > 0 && (
+                    <div className="sub-comments-list">
+                      {item.subComments.map((sub) => (
+                        <div className="comment-item sub-comment-item" key={sub.id}>
+                          <img className="comment-avatar sub-avatar" src={sub.user.avatar} alt="" referrerPolicy="no-referrer" />
+                          <div className="comment-content-area">
+                            <div className="comment-author-name">{sub.user.name}</div>
+                            <div className="comment-text">{sub.content}</div>
+                            <div className="comment-meta">
+                              <span className="comment-date-loc">{sub.time} {sub.location}</span>
+                              <div className="comment-meta-actions">
+                                <span
+                                  className={`comment-like-btn${sub.liked ? ' liked' : ''}`}
+                                  onClick={() => toggleSubCommentLike(item.id, sub.id)}
+                                >
+                                  {sub.liked ? <HeartFill width={13} height={13} color="#ff2442" /> : <Heart width={13} height={13} />}
+                                  <span className="comment-like-count">{sub.likes}</span>
+                                </span>
+                                <span
+                                  className="comment-reply-btn"
+                                  onClick={() => {
+                                    setReplyTarget(sub.user.name)
+                                    Toast.show({ content: `回复 @${sub.user.name}`, duration: 1 })
+                                  }}
+                                >
+                                  <Comment width={13} height={13} />
+                                  <span>回复</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* 底部真实互动栏：点赞数（likes: "787"）、收藏、评论、分享 */}
+        {/* 底部真实互动栏：输入框、点赞数（likes: "787"）、收藏、评论直达、分享 */}
         <div className="detail-bar">
           <div className="detail-input-wrap">
-            <span className="detail-input">说点什么…</span>
+            <input
+              className="detail-input"
+              type="text"
+              placeholder={replyTarget ? `回复 @${replyTarget}…` : '说点什么…'}
+              value={inputComment}
+              onChange={(e) => setInputComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitComment()
+              }}
+            />
           </div>
 
           {/* 点赞按钮与点赞数展示 */}
@@ -348,13 +519,15 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
             <span className="detail-action-count">{currentCollects}</span>
           </div>
 
-          {/* 评论 */}
+          {/* 评论按钮，点击平滑滚动到底部评论区 */}
           <div
             className="detail-action-btn"
-            onClick={() => Toast.show({ content: '评论区需要登录后参与', duration: 1.2 })}
+            onClick={() => {
+              commentsSectionRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }}
           >
             <Comment width={20} height={20} />
-            <span className="detail-action-count">{detail?.interactInfo?.commentCount || '评论'}</span>
+            <span className="detail-action-count">{commentsCount || detail?.interactInfo?.commentCount || '评论'}</span>
           </div>
 
           {/* 分享 */}

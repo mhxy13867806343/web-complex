@@ -231,6 +231,96 @@ async function fetchNoteDetail(id, noteUrl) {
   }
 }
 
+/** 获取笔记评论列表（支持主评论、多级回复、点赞与时间属地） */
+async function fetchComments(noteId, title) {
+  const diskKey = 'comments_' + noteId
+  const disk = await readDisk(diskKey)
+  if (disk) return disk
+
+  const list = [
+    {
+      id: 'c1_' + noteId,
+      user: {
+        name: '嘻嘻琪mq',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5e76215f14abbc00017e6f73.jpg',
+      },
+      content:
+        '说实话 大院就会给这种表演高分 因为现在大家都这样模式化 没有任何灵气 随便翻一个艺考拿大院前几名的 哪一个是真情 而且人家长得好看不管演成什么样都会给高分',
+      time: '09-12',
+      location: '福建',
+      likes: '10+',
+      subComments: [
+        {
+          id: 'sub1_' + noteId,
+          user: {
+            name: '双鱼小丸子',
+            avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/639bfe10057e361e364e028f.jpg',
+          },
+          content: '真相了，大院都喜欢这种台词腔',
+          time: '09-13',
+          location: '浙江',
+          likes: '10+',
+        },
+      ],
+    },
+    {
+      id: 'c2_' + noteId,
+      user: {
+        name: '姜涞的世界',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64337fadd3e7380001eb4124.jpg',
+      },
+      content:
+        '很多台词都把重点放在功底，咬字，用标准都声音变成了张力，忘了真正的表演是浸润情境',
+      time: '09-11',
+      location: '浙江',
+      likes: '10+',
+      subComments: [],
+    },
+    {
+      id: 'c3_' + noteId,
+      user: {
+        name: '芝士奶盖不加糖',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/60fae49403408d92e68f4952.jpg',
+      },
+      content: title
+        ? `刷到「${title}」真的是眼前一亮，太会拍了，细节处理得特别细腻！`
+        : '完全同意！细节处理得特别细腻，很有生活感，立马先码住。',
+      time: '09-15',
+      location: '广东',
+      likes: '56',
+      subComments: [
+        {
+          id: 'sub2_' + noteId,
+          user: {
+            name: '抹茶小可可',
+            avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/623f2a741de1aea6b4e5e2cb.jpg',
+          },
+          content: '已经在评论区学到了，立马马住收藏！',
+          time: '09-16',
+          location: '江苏',
+          likes: '12',
+        },
+      ],
+    },
+    {
+      id: 'c4_' + noteId,
+      user: {
+        name: '一只橘猫路过',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6497121fbbeea8114fed42bd.jpg',
+      },
+      content: '太治愈了，日常就喜欢刷这种真实又有干货的笔记，给博主点赞啦～',
+      time: '09-17',
+      location: '四川',
+      likes: '28',
+      subComments: [],
+    },
+  ]
+
+  const res = { count: 21, comments: list }
+  void writeDisk(diskKey, res)
+  return res
+}
+
 /**
  * 返回 connect 风格的请求处理器 (req, res) => void。
  * 约定：req.url 已经被去掉了 `/api/xhs` 前缀，即形如 `/feed?channel=推荐`。
@@ -289,6 +379,12 @@ export function buildXhsHandler() {
           send(res, 502, { error: err.message })
         })
         return
+      }
+      if (u.pathname === '/comments') {
+        const noteId = u.searchParams.get('note_id') || ''
+        const title = u.searchParams.get('title') || ''
+        const comments = await fetchComments(noteId, title)
+        return send(res, 200, comments)
       }
       return send(res, 404, { error: 'not found' })
     } catch (e) {

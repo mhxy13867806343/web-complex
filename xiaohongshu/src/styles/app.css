@@ -986,3 +986,116 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+/* ---------------- 真实小红书评论区 ---------------- */
+.detail-comments-wrap {
+  padding: 16px 16px 24px;
+  background: #fff;
+  border-top: 8px solid #f8f8f8;
+}
+
+.comments-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comment-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.comment-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.sub-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.comment-content-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-author-name {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.comment-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #222;
+  word-break: break-word;
+  white-space: pre-wrap;
+  margin-bottom: 6px;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #999;
+}
+
+.comment-date-loc {
+  font-size: 12px;
+  color: #999;
+}
+
+.comment-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.comment-like-btn,
+.comment-reply-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #666;
+}
+
+.comment-like-btn.liked {
+  color: var(--xhs-red);
+}
+
+.comment-like-count {
+  font-size: 12px;
+}
+
+.sub-comments-list {
+  margin-left: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}

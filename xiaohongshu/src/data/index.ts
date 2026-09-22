@@ -49,5 +49,19 @@ export interface NoteDetailData {
   }
 }
 
+export interface CommentItem {
+  id: string
+  user: {
+    name: string
+    avatar: string
+  }
+  content: string
+  time: string
+  location?: string
+  likes: string
+  liked?: boolean
+  subComments?: CommentItem[]
+}
+
 /** 每次「上拉加载」追加的条数 */
 export const PAGE_SIZE = 12
