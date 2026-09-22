@@ -6,6 +6,7 @@ import { fetchSearchResultsApi, type SearchResultData } from '../data/api'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import { Toast } from './Toast'
 import Waterfall from './Waterfall'
+import ChannelChips from './ChannelChips'
 import { openSearchResultRoute } from '../router'
 
 const SCROLLER_SELECTOR = '#search-result-body'
@@ -458,22 +459,14 @@ export default function SearchResult({
         </button>
       </div>
 
-      {/* 二级横向热词选择条（图 2） */}
+      {/* 二级横向热词选择条（复用首页 ChannelChips 组件，支持拖拽横滑、滚轮、自动居中、翻页箭头） */}
       <div className="search-subtags-bar">
-        <div className="search-subtags-scroll">
-          {subTagsList.map((st) => (
-            <button
-              key={st}
-              type="button"
-              className={`search-subtag-chip ${activeSubTag === st ? 'active' : ''}`}
-              onClick={() => {
-                setActiveSubTag(st)
-              }}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
+        <ChannelChips
+          className="search-chips-wrap"
+          channels={subTagsList}
+          value={activeSubTag}
+          onChange={(st) => setActiveSubTag(st)}
+        />
       </div>
 
       {/* 筛选多维浮层（完全对应图 3） */}

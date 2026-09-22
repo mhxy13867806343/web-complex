@@ -4,6 +4,7 @@ interface Props {
   channels: string[]
   value: string
   onChange: (name: string) => void
+  className?: string
 }
 
 /**
@@ -17,7 +18,7 @@ interface Props {
  *   3. 悬停时出现左右翻页箭头
  * 并额外做两侧渐隐 + 箭头显隐，提示「这一行还有内容」。
  */
-export default function ChannelChips({ channels, value, onChange }: Props) {
+export default function ChannelChips({ channels, value, onChange, className = '' }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const drag = useRef({ active: false, startX: 0, startLeft: 0, moved: 0 })
   const [canLeft, setCanLeft] = useState(false)
@@ -143,7 +144,11 @@ export default function ChannelChips({ channels, value, onChange }: Props) {
   }, [])
 
   return (
-    <div className={`chips-wrap${canLeft ? ' can-left' : ''}${canRight ? ' can-right' : ''}`}>
+    <div
+      className={`chips-wrap${canLeft ? ' can-left' : ''}${canRight ? ' can-right' : ''}${
+        className ? ` ${className}` : ''
+      }`}
+    >
       <div
         ref={scrollRef}
         className="chips"
