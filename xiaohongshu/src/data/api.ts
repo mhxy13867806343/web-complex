@@ -54,17 +54,36 @@ function getApiBase(): string {
   return ''
 }
 
+function findStaticNote(id: string): Partial<Note> | undefined {
+  for (const notes of Object.values(STATIC_FEEDS)) {
+    const found = notes.find((n) => n.id === id)
+    if (found) return found
+  }
+  const synth = id.match(/^static_synth_(.+)_([a-f0-9]{24})$/i)
+  if (!synth) return undefined
+  const keyword = decodeURIComponent(synth[1])
+  const sourceId = synth[2]
+  for (const notes of Object.values(STATIC_FEEDS)) {
+    const found = notes.find((n) => n.id === sourceId)
+    if (!found) continue
+    return {
+      ...found,
+      id,
+      title: found.title ? `${keyword} · ${found.title}` : keyword,
+      tags: [keyword, ...(found.tags || [])],
+    }
+  }
+  return undefined
+}
+
 /** 静态环境下构建单篇笔记完整详情（零网络请求、零 404） */
 function buildStaticNoteDetail(id: string, fallbackNote?: Partial<Note>): NoteDetailData {
-  let note = fallbackNote
-  if (!note || !note.title) {
-    for (const ch of Object.keys(STATIC_FEEDS)) {
-      const found = STATIC_FEEDS[ch].find((n) => n.id === id)
-      if (found) {
-        note = found
-        break
-      }
-    }
+  const found = findStaticNote(id)
+  const note = {
+    ...found,
+    ...fallbackNote,
+    title: fallbackNote?.title || found?.title,
+    cover: fallbackNote?.cover || found?.cover,
   }
 
   const title = note?.title || '小红书精选笔记'
@@ -399,26 +418,7 @@ export interface HotSearchesData {
 /**
  * 实时获取热门搜索词 / 搜索推荐建议列表（GET /api/xhs/hot_searches）
  */
-export async function fetchHotSearchesApi(
-  keyword?: string,
-  signal?: AbortSignal
-): Promise<HotSearchesData> {
-  const base = getApiBase()
-  const qs = new URLSearchParams()
-  if (keyword) qs.set('keyword', keyword)
-  const path = `/api/xhs/hot_searches${qs.toString() ? `?${qs.toString()}` : ''}`
-  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
-
-  try {
-    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
-    if (res.ok) {
-      return (await res.json()) as HotSearchesData
-    }
-  } catch (e) {
-    if ((e as Error)?.name === 'AbortError') throw e
-  }
-
-  // 离线/静态兜底：从静态频道与笔记库中动态抽取热词，不写死固定数组
+function buildStaticHotSearches(keyword?: string): HotSearchesData {
   const dynamicMap = new Map<string, number>()
   STATIC_CHANNELS.forEach((c) => {
     if (c.name && c.name !== '推荐') dynamicMap.set(c.name, 400000)
@@ -463,6 +463,30 @@ export async function fetchHotSearchesApi(
   }
 }
 
+export async function fetchHotSearchesApi(
+  keyword?: string,
+  signal?: AbortSignal
+): Promise<HotSearchesData> {
+  if (isStaticEnvironment()) return buildStaticHotSearches(keyword)
+
+  const base = getApiBase()
+  const qs = new URLSearchParams()
+  if (keyword) qs.set('keyword', keyword)
+  const path = `/api/xhs/hot_searches${qs.toString() ? `?${qs.toString()}` : ''}`
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as HotSearchesData
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e
+  }
+
+  return buildStaticHotSearches(keyword)
+}
+
 /**
  * 抓取搜索结果列表（支持关键词搜索、排序模式与笔记类型过滤）
  */
@@ -483,13 +507,15 @@ export async function fetchSearchResultsApi(
   const path = `/api/xhs/search?${qs.toString()}`
   const url = base ? `${base.replace(/\/$/, '')}${path}` : path
 
-  try {
-    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
-    if (res.ok) {
-      return (await res.json()) as SearchResultData
+  if (!isStaticEnvironment()) {
+    try {
+      const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+      if (res.ok) {
+        return (await res.json()) as SearchResultData
+      }
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') throw e
     }
-  } catch (e) {
-    if ((e as Error)?.name === 'AbortError') throw e
   }
 
   // 静态或离线兜底：从 STATIC_FEEDS 检索
@@ -603,6 +629,9 @@ export function liveListQuery(cursor = '0', category = '0') {
 }
 
 export async function fetchLiveList(cursor = '0', category = '0', signal?: AbortSignal) {
+  if (isStaticEnvironment()) {
+    return { rooms: [], cursor: '', hasMore: false, upstreamStatus: 0 }
+  }
   const res = await fetch(`/api/xhs/live?${liveListQuery(cursor, category)}`, { signal, headers: { Accept: 'application/json' } })
   if (!res.ok) throw new Error('直播加载失败')
   return (await res.json()) as {
