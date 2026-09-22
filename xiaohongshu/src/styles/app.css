@@ -461,28 +461,38 @@
   background: #fff;
 }
 
-/* 顶部浮动导航栏（左侧返回 + 右侧关闭） */
-.detail-top-nav {
+/* 顶部导航吸顶栏：顶部封面阶段背景透明，滚动到正文后变纯白吸顶条且圈内黑底隐藏 */
+.detail-nav-header {
   position: absolute;
-  top: 14px;
+  top: 0;
   left: 0;
   right: 0;
+  height: 50px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 14px;
-  pointer-events: none;
+  padding: 0 12px;
   z-index: 1000;
+  background: transparent;
+  transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+  pointer-events: none;
+}
+
+.detail-nav-header.is-scrolled {
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  pointer-events: auto;
 }
 
 .detail-nav-btn {
   pointer-events: auto;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.58);
   border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #fff;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -490,20 +500,92 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   padding: 0;
 }
 
-.detail-nav-btn:hover {
-  background: rgba(0, 0, 0, 0.78);
-  transform: scale(1.08);
+/* 滚动到正文后：圈内黑底与边框完全隐藏！变为极简深灰图标，决不遮挡正文 */
+.detail-nav-header.is-scrolled .detail-nav-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: #333333;
 }
 
-.detail-nav-btn:active {
+.detail-nav-header.is-scrolled .detail-nav-btn:hover {
+  background: #f4f4f4;
+  color: #000000;
+  transform: scale(1.06);
+}
+
+.detail-nav-header.is-scrolled .detail-nav-btn:active {
   transform: scale(0.92);
-  background: rgba(0, 0, 0, 0.9);
+  background: #ebebeb;
+}
+
+/* 顶部导航居中作者信息（仅滚动进入正文后渐入） */
+.detail-nav-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 8px;
+}
+
+.detail-nav-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  animation: navFadeIn 0.2s ease forwards;
+}
+
+@keyframes navFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-author-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #eee;
+}
+
+.nav-author-avatar-fallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  color: #666;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-author-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-scroll {

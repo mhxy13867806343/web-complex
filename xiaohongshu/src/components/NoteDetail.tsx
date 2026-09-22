@@ -55,11 +55,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
   // 平滑关闭动画状态控制：避免 note 突变导致 DOM 瞬间卸载而跳过下滑动画
   const [activeNote, setActiveNote] = useState<Note | null>(note)
   const [isClosing, setIsClosing] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     if (note) {
       setActiveNote(note)
       setIsClosing(false)
+      setScrolled(false)
     }
   }, [note])
 
@@ -213,8 +215,10 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
         onMouseMove={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
-        {/* 顶部悬浮导航区：左侧返回箭头 + 右侧关闭按钮，磨砂黑底 + 白色高光图标，任何背景下一清二楚 */}
-        <div className="detail-top-nav">
+        {/* 顶部导航吸顶栏：
+            - 顶部封面阶段（scrolled=false）：背景透明，左右为磨砂黑圈按钮（防背景图片干扰）
+            - 滚动进入正文后（scrolled=true）：平滑变为纯白吸顶条，圈内黑底完全隐藏，按钮变为极简深灰图标，中间露出作者信息，绝不遮挡正文标题 */}
+        <div className={`detail-nav-header${scrolled ? ' is-scrolled' : ''}`}>
           <button
             type="button"
             className="detail-nav-btn detail-nav-back"
@@ -224,8 +228,31 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
             }}
             aria-label="返回上一页"
           >
-            <ArrowLeft width={20} height={20} color="#ffffff" />
+            <ArrowLeft width={20} height={20} />
           </button>
+
+          <div className="detail-nav-center">
+            {scrolled && (
+              <div className="detail-nav-author">
+                {avatarBroken || !currentNote.author.avatar ? (
+                  <span className="nav-author-avatar-fallback">
+                    {currentNote.author.name.slice(0, 1)}
+                  </span>
+                ) : (
+                  <img
+                    className="nav-author-avatar"
+                    src={detail?.user?.avatar || currentNote.author.avatar}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <span className="nav-author-name">
+                  {detail?.user?.name || currentNote.author.name}
+                </span>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             className="detail-nav-btn detail-nav-close"
@@ -240,8 +267,8 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
               height="18"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#ffffff"
-              strokeWidth="2.5"
+              stroke="currentColor"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
@@ -251,7 +278,17 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
           </button>
         </div>
 
-        <div className="detail-scroll">
+        <div
+          className="detail-scroll"
+          onScroll={(e) => {
+            const top = e.currentTarget.scrollTop
+            if (top > 45 && !scrolled) {
+              setScrolled(true)
+            } else if (top <= 45 && scrolled) {
+              setScrolled(false)
+            }
+          }}
+        >
           {/* 顶部媒体区：视频直接播放 / 图集多图轮播（含 2/5、小圆点、自动滚动） */}
           <div className="detail-media-container">
             {isVideo && detail?.videoUrl ? (
