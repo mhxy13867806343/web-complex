@@ -47,6 +47,8 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
 
   // 手势滑动图集
   const touchStart = useRef({ x: 0, y: 0 })
+  const [isHovered, setIsHovered] = useState(false)
+  const isTouching = useRef(false)
 
   useEffect(() => {
     if (!note) {
@@ -79,29 +81,53 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
     return () => ac.abort()
   }, [note])
 
-  if (!note) return null
-
-  const isVideo = note.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl
-  const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : [note.cover]
-  const currentLikes = parseCount(detail?.interactInfo?.likedCount || note.likes, likeDelta)
+  const isVideo = note ? (note.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl) : false
+  const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (note ? [note.cover] : [])
+  const currentLikes = parseCount(detail?.interactInfo?.likedCount || note?.likes, likeDelta)
   const currentCollects = parseCount(detail?.interactInfo?.collectedCount || '0', collected ? 1 : 0)
 
+  // 多图轮播自动滚动（每 3 秒自动滚动到下一张，鼠标悬停或手指按住时自动暂停）
+  useEffect(() => {
+    if (images.length <= 1 || isVideo || isHovered) return
+
+    const timer = setInterval(() => {
+      if (isTouching.current) return
+      setCurrentImgIndex((prev) => (prev + 1) % images.length)
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [images.length, isVideo, isHovered])
+
+  if (!note) return null
+
   const onTouchStart = (e: React.TouchEvent) => {
+    isTouching.current = true
     const t = e.touches[0]
     touchStart.current = { x: t.clientX, y: t.clientY }
   }
 
   const onTouchEnd = (e: React.TouchEvent) => {
+    isTouching.current = false
     const t = e.changedTouches[0]
     const dx = t.clientX - touchStart.current.x
     const dy = t.clientY - touchStart.current.y
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0 && currentImgIndex < images.length - 1) {
-        setCurrentImgIndex((i) => i + 1)
-      } else if (dx > 0 && currentImgIndex > 0) {
-        setCurrentImgIndex((i) => i - 1)
+    if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) {
+        // 向左划：下一张（循环）
+        setCurrentImgIndex((i) => (i + 1) % images.length)
+      } else if (dx > 0) {
+        // 向右划：上一张（循环）
+        setCurrentImgIndex((i) => (i - 1 + images.length) % images.length)
       }
     }
+  }
+
+  const getVideoSrc = (rawUrl?: string) => {
+    if (!rawUrl) return ''
+    if (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      return `/api/xhs/video?url=${encodeURIComponent(rawUrl)}`
+    }
+    return rawUrl.replace(/^http:/, 'https:')
   }
 
   return (
@@ -123,7 +149,7 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
               <div className="detail-video-wrap">
                 <video
                   className="detail-video-player"
-                  src={detail.videoUrl}
+                  src={getVideoSrc(detail.videoUrl)}
                   poster={note.cover}
                   controls
                   autoPlay
@@ -146,6 +172,8 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
             ) : (
               <div
                 className="carousel-wrap"
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 onTouchStart={onTouchStart}
                 onTouchEnd={onTouchEnd}
               >

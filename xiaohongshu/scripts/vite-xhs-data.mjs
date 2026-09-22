@@ -266,6 +266,30 @@ export function buildXhsHandler() {
         const data = await fetchNoteDetail(id, noteUrl)
         return send(res, 200, data)
       }
+      if (u.pathname === '/video') {
+        const videoUrl = u.searchParams.get('url')
+        if (!videoUrl) return send(res, 400, { error: 'url is required' })
+        const headers = {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+          'Accept': '*/*',
+        }
+        if (req.headers.range) {
+          headers['Range'] = req.headers.range
+        }
+        const client = videoUrl.startsWith('https:') ? await import('node:https') : await import('node:http')
+        const proxyReq = client.get(videoUrl, { headers }, (upstream) => {
+          res.statusCode = upstream.statusCode || 200
+          for (const [key, val] of Object.entries(upstream.headers)) {
+            if (val) res.setHeader(key, val)
+          }
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          upstream.pipe(res)
+        })
+        proxyReq.on('error', (err) => {
+          send(res, 502, { error: err.message })
+        })
+        return
+      }
       return send(res, 404, { error: 'not found' })
     } catch (e) {
       console.warn('[api/xhs]', e?.message || e)
