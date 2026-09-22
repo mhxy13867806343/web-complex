@@ -423,25 +423,11 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
               </div>
             )}
 
-            <div className="detail-meta-row">
-              <span className="detail-pub-time">
-                {detail?.time ? `发布于 ${new Date(detail.time).toLocaleDateString()}` : '刚刚'}
-              </span>
-              <a
-                className="btn-open-link"
-                href={currentNote.noteUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => Toast.show({ content: '跳转小红书原站', duration: 1.2 })}
-              >
-                在原站打开 ↗
-              </a>
-            </div>
           </div>
 
-          {/* 作者信息栏 */}
+          {/* 作者与发布信息卡片（统一合并，消灭孤立空栏与割裂排版） */}
           <div
-            className="detail-author"
+            className="detail-author-card"
             onClick={() => {
               onOpenUser?.({
                 name: detail?.user?.name || currentNote.author.name,
@@ -451,20 +437,43 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
               }, currentNote)
             }}
           >
-            {avatarBroken || !currentNote.author.avatar ? (
-              <span className="avatar-emoji" style={{ background: '#f0f0f0' }}>
-                {currentNote.author.name.slice(0, 1)}
-              </span>
-            ) : (
-              <img
-                className="avatar-img avatar-img-lg"
-                src={detail?.user?.avatar || currentNote.author.avatar}
-                alt=""
-                referrerPolicy="no-referrer"
-                onError={() => setAvatarBroken(true)}
-              />
-            )}
-            <span className="detail-author-name">{detail?.user?.name || currentNote.author.name}</span>
+            <div className="author-card-left">
+              {avatarBroken || !currentNote.author.avatar ? (
+                <span className="author-card-avatar-fallback">
+                  {currentNote.author.name.slice(0, 1)}
+                </span>
+              ) : (
+                <img
+                  className="author-card-avatar"
+                  src={detail?.user?.avatar || currentNote.author.avatar}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setAvatarBroken(true)}
+                />
+              )}
+              <div className="author-card-info">
+                <div className="author-card-name-row">
+                  <span className="author-card-name">{detail?.user?.name || currentNote.author.name}</span>
+                  <span className="author-card-arrow">›</span>
+                </div>
+                <div className="author-card-pub-time">
+                  {detail?.time ? `发布于 ${new Date(detail.time).toLocaleDateString()}` : '刚刚'}
+                </div>
+              </div>
+            </div>
+
+            <a
+              className="btn-open-link"
+              href={currentNote.noteUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => {
+                e.stopPropagation()
+                Toast.show({ content: '跳转小红书原站', duration: 1.2 })
+              }}
+            >
+              在原站打开 ↗
+            </a>
           </div>
 
           {/* 真实评论区（完全还原截图视觉） */}
