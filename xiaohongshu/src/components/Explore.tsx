@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
+import { BackTop, Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
 import type { Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
+import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import ChannelChips from './ChannelChips'
 import NoteDetail from './NoteDetail'
@@ -17,6 +18,45 @@ const SCROLLER_ID = 'page-body'
 /** 单个流最多累积多少条 */
 const CAP = 300
 
+/** 默认包含所有预置频道，确保初次根据 URL 渲染时 tab 即可直接定位选中 */
+const INITIAL_CHANNELS = [RECOMMEND, ...STATIC_CHANNELS.map((c) => c.name)]
+
+/** 从当前地址栏获取频道参数（支持 ?channel=彩妆、?tab=彩妆 以及 hash 锚点） */
+function getInitialChannel(): string {
+  if (typeof window === 'undefined') return RECOMMEND
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('channel') || params.get('tab')
+    if (q) return decodeURIComponent(q).trim()
+    const hash = window.location.hash.replace(/^#\/?/, '').trim()
+    if (hash) {
+      const hashParams = new URLSearchParams(hash)
+      const hq = hashParams.get('channel') || hashParams.get('tab')
+      if (hq) return decodeURIComponent(hq).trim()
+      return decodeURIComponent(hash).trim()
+    }
+  } catch {
+    /* fallback */
+  }
+  return RECOMMEND
+}
+
+/** 同步当前频道到浏览器地址栏（写入 history，支持刷新与后退前进） */
+function syncUrlChannel(ch: string) {
+  if (typeof window === 'undefined') return
+  try {
+    const url = new URL(window.location.href)
+    if (ch && ch !== RECOMMEND) {
+      url.searchParams.set('channel', ch)
+    } else {
+      url.searchParams.delete('channel')
+    }
+    window.history.pushState({ channel: ch }, '', url.toString())
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 去重拼接 */
 function mergeNotes(head: Note[], tail: Note[]): Note[] {
   const seen = new Set<string>()
@@ -30,8 +70,8 @@ function mergeNotes(head: Note[], tail: Note[]): Note[] {
 }
 
 export default function Explore() {
-  const [channels, setChannels] = useState<string[]>([RECOMMEND])
-  const [channel, setChannel] = useState<string>(RECOMMEND)
+  const [channels, setChannels] = useState<string[]>(INITIAL_CHANNELS)
+  const [channel, setChannel] = useState<string>(getInitialChannel)
   /** 每个流抓到的笔记列表 */
   const [feeds, setFeeds] = useState<Record<string, Note[]>>({})
   const [loading, setLoading] = useState(false)
@@ -95,6 +135,20 @@ export default function Explore() {
     },
     []
   )
+
+  // 监听浏览器前进 / 后退 / hash 改变，自动同步切换频道
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const ch = getInitialChannel()
+      setChannel((prev) => (prev !== ch ? ch : prev))
+    }
+    window.addEventListener('popstate', handleUrlChange)
+    window.addEventListener('hashchange', handleUrlChange)
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange)
+      window.removeEventListener('hashchange', handleUrlChange)
+    }
+  }, [])
 
   // 分类实时拉取
   useEffect(() => {
@@ -173,6 +227,40 @@ export default function Explore() {
     Toast.show({ content: next ? '已收藏' : '已取消收藏', duration: 1.2 })
   }
 
+  // 左右滑动手势切换频道（像小红书原生 App 一样左右滑屏切 Tab）
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 })
+  const onFeedTouchStart = (e: React.TouchEvent) => {
+    if (pulling || refreshing || openNote) return
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() }
+  }
+
+  const onFeedTouchEnd = (e: React.TouchEvent) => {
+    if (pulling || refreshing || openNote) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    const dt = Date.now() - touchStartRef.current.time
+
+    // 滑动位移大于 55px，横向大于纵向 1.3 倍，且在 600ms 内完成
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.3 && dt < 600) {
+      const idx = channels.indexOf(channel)
+      if (idx !== -1) {
+        if (dx < 0 && idx < channels.length - 1) {
+          // 向左滑：切换到下一个频道
+          const nextCh = channels[idx + 1]
+          setChannel(nextCh)
+          syncUrlChannel(nextCh)
+        } else if (dx > 0 && idx > 0) {
+          // 向右滑：切换到上一个频道
+          const prevCh = channels[idx - 1]
+          setChannel(prevCh)
+          syncUrlChannel(prevCh)
+        }
+      }
+    }
+  }
+
   const busy = refreshing || loading
   const pullText = refreshing ? '正在刷新…' : distance >= PTR_TRIGGER ? '松手立即刷新' : '下拉刷新'
   /** 接口挂了且一条数据都没有时的说明 */
@@ -197,46 +285,55 @@ export default function Explore() {
           channels={channels}
           value={channel}
           onChange={(c) => {
-            if (c !== channel) setChannel(c)
+            if (c !== channel) {
+              setChannel(c)
+              syncUrlChannel(c)
+            }
           }}
         />
       </div>
 
-      {offline ? (
-        <div className="empty-box">
-          <Empty description="接口不可用，请用 npm run dev 或 npm run start 启动带 /api 的服务" />
-        </div>
-      ) : busy && list.length === 0 ? (
-        <div className="empty-box">
-          <Loading>正在抓取最新数据…</Loading>
-        </div>
-      ) : list.length === 0 ? (
-        <div className="empty-box">
-          <Empty description="这个频道暂时拿不到数据，点右上角刷新试试" />
-        </div>
-      ) : (
-        <>
-          <Waterfall notes={list} onOpen={setOpenNote} />
-          <div
-            className="loadmore-trigger"
-            onClick={() => {
-              if (!loadingRef.current && hasMore) {
-                void load(channel, false, 'more')
-              }
-            }}
-            style={{
-              textAlign: 'center',
-              padding: '16px 0 28px',
-              color: '#999',
-              fontSize: '13px',
-              cursor: 'pointer',
-              userSelect: 'none',
-            }}
-          >
-            {loading ? '正在请求最新笔记…' : hasMore ? '上拉或点击加载更多' : '— 已经到底了 —'}
+      <div
+        className="feed-swipe-area"
+        onTouchStart={onFeedTouchStart}
+        onTouchEnd={onFeedTouchEnd}
+      >
+        {offline ? (
+          <div className="empty-box">
+            <Empty description="接口不可用，请用 npm run dev 或 npm run start 启动带 /api 的服务" />
           </div>
-        </>
-      )}
+        ) : busy && list.length === 0 ? (
+          <div className="empty-box">
+            <Loading>正在抓取最新数据…</Loading>
+          </div>
+        ) : list.length === 0 ? (
+          <div className="empty-box">
+            <Empty description="这个频道暂时拿不到数据，点右上角刷新试试" />
+          </div>
+        ) : (
+          <>
+            <Waterfall notes={list} onOpen={setOpenNote} />
+            <div
+              className="loadmore-trigger"
+              onClick={() => {
+                if (!loadingRef.current && hasMore) {
+                  void load(channel, false, 'more')
+                }
+              }}
+              style={{
+                textAlign: 'center',
+                padding: '16px 0 28px',
+                color: '#999',
+                fontSize: '13px',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              {loading ? '正在请求最新笔记…' : hasMore ? '上拉或点击加载更多' : '— 已经到底了 —'}
+            </div>
+          </>
+        )}
+      </div>
 
       <InfiniteLoading
         hasMore={hasMore}
@@ -252,6 +349,13 @@ export default function Explore() {
         collected={openNote ? !!collected[openNote.id] : false}
         onCollect={toggleCollect}
         onClose={() => setOpenNote(null)}
+      />
+
+      {/* NutUI BackTop 返回顶部 */}
+      <BackTop
+        target={SCROLLER_ID}
+        threshold={240}
+        duration={500}
       />
     </div>
   )

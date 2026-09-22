@@ -53,18 +53,23 @@ export default function ChannelChips({ channels, value, onChange }: Props) {
    * 不然点到「健身」「视频」这些靠右的频道时，用户根本不知道自己选了啥。
    */
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const active = el.querySelector<HTMLElement>('.chip.active')
-    if (!active) return
-    const box = el.getBoundingClientRect()
-    const chip = active.getBoundingClientRect()
-    // 用 rect 而不是 offsetLeft，避免受 offsetParent / padding 影响
-    const delta = chip.left + chip.width / 2 - (box.left + box.width / 2)
-    if (Math.abs(delta) < 4) return
-    // 平滑一点，跟随动画到一半时也能看到"滚过去了"
-    el.scrollBy({ left: delta, behavior: 'smooth' })
-  }, [value])
+    const scrollToActive = () => {
+      const el = scrollRef.current
+      if (!el) return
+      const active = el.querySelector<HTMLElement>('.chip.active')
+      if (!active) return
+      const box = el.getBoundingClientRect()
+      const chip = active.getBoundingClientRect()
+      // 用 rect 而不是 offsetLeft，避免受 offsetParent / padding 影响
+      const delta = chip.left + chip.width / 2 - (box.left + box.width / 2)
+      if (Math.abs(delta) < 4) return
+      // 平滑一点，跟随动画到一半时也能看到"滚过去了"
+      el.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+    scrollToActive()
+    const timer = window.setTimeout(scrollToActive, 60)
+    return () => window.clearTimeout(timer)
+  }, [value, channels.length])
 
   /** 箭头翻页：一次滚一屏的 70% */
   const scrollByPage = (dir: -1 | 1) => {

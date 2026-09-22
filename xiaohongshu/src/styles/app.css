@@ -640,8 +640,34 @@
 /* ---------------- 空状态 ---------------- */
 .empty-box {
   padding: 60px 0;
-  text-align-center: center;
   text-align: center;
   color: #9b9b9b;
   font-size: 13px;
+}
+
+/* ---------------- NutUI BackTop 返回顶部 ---------------- */
+.phone .nut-hoverbutton-container {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  z-index: 100;
+}
+
+.nut-backtop {
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #333333;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nut-backtop:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.nut-backtop:active {
+  transform: scale(0.92);
+  color: var(--xhs-red);
 }

@@ -30,20 +30,43 @@ export function usePullToRefresh(
     if (!el) return
 
     let active = false
+    let startX = 0
     let startY = 0
     let dist = 0
+    let dirLock: 'vertical' | 'horizontal' | null = null
 
-    const begin = (y: number) => {
+    const begin = (x: number, y: number) => {
       if (el.scrollTop > 0) return
       active = true
+      startX = x
       startY = y
+      dirLock = null
       dist = 0
-      setPulling(true)
     }
 
-    const move = (y: number, prevent: (() => void) | null) => {
+    const move = (x: number, y: number, prevent: (() => void) | null) => {
       if (!active) return
+      const dx = Math.abs(x - startX)
       const dy = y - startY
+
+      // 手势方向仲裁：区分是横向滑动还是纵向下拉刷新
+      if (!dirLock) {
+        if (dx > 6 && dx > Math.abs(dy)) {
+          // 判定为横向手势，不触发下拉刷新
+          dirLock = 'horizontal'
+          active = false
+          setPulling(false)
+          return
+        }
+        if (dy > 6 && dy > dx) {
+          // 锁定为纵向下拉
+          dirLock = 'vertical'
+          setPulling(true)
+        }
+      }
+
+      if (dirLock !== 'vertical') return
+
       // 往上拖（相当于正常滚动）就交还给浏览器
       if (dy <= 0) {
         if (dist !== 0) {
@@ -63,8 +86,9 @@ export function usePullToRefresh(
     }
 
     const finish = async () => {
-      if (!active) return
+      if (!active && !dirLock) return
       active = false
+      dirLock = null
       setPulling(false)
       const d = dist
       dist = 0
@@ -82,11 +106,17 @@ export function usePullToRefresh(
     }
 
     // ---- 触摸 ----
-    const onTouchStart = (e: TouchEvent) => begin(e.touches[0].clientY)
-    const onTouchMove = (e: TouchEvent) =>
-      move(e.touches[0].clientY, () => {
+    const onTouchStart = (e: TouchEvent) => {
+      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop')) return
+      const t = e.touches[0]
+      begin(t.clientX, t.clientY)
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0]
+      move(t.clientX, t.clientY, () => {
         if (e.cancelable) e.preventDefault()
       })
+    }
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     el.addEventListener('touchend', finish)
@@ -95,9 +125,10 @@ export function usePullToRefresh(
     // ---- 鼠标（桌面预览调试用）----
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return
-      begin(e.clientY)
+      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop')) return
+      begin(e.clientX, e.clientY)
     }
-    const onMouseMove = (e: MouseEvent) => move(e.clientY, null)
+    const onMouseMove = (e: MouseEvent) => move(e.clientX, e.clientY, null)
     el.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', finish)
