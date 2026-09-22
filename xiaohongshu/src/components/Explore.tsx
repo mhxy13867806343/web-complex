@@ -180,16 +180,20 @@ export default function Explore() {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  /** 下拉刷新 */
-  const { distance, pulling, refreshing } = usePullToRefresh(SCROLLER, async () => {
-    const n = await load(channel, false, 'refresh')
-    if (n) Toast.show({ content: `已刷新 ${n} 条最新笔记`, duration: 1.6 })
-  })
+  /** 下拉刷新：详情弹窗打开时彻底关闭，防止任何下拉手势穿透触发主页刷新 */
+  const { distance, pulling, refreshing } = usePullToRefresh(
+    SCROLLER,
+    async () => {
+      const n = await load(channel, false, 'refresh')
+      if (n) Toast.show({ content: `已刷新 ${n} 条最新笔记`, duration: 1.6 })
+    },
+    !openNote
+  )
 
   /** 上拉加载：每一次都发起真实的 Ajax / Fetch 请求并追加数据 */
   const loadMore = useCallback(() => {
     return new Promise<void>((resolve) => {
-      if (loadingRef.current || dead[channel] || bottom[channel]) {
+      if (openNote || loadingRef.current || dead[channel] || bottom[channel]) {
         resolve()
         return
       }
@@ -197,13 +201,13 @@ export default function Explore() {
         resolve()
       })
     })
-  }, [channel, dead, bottom, load])
+  }, [channel, dead, bottom, load, openNote])
 
   /** 滚动触底检测双保险（同时监听 window 和 #page-body，确保任何视口/设备下均能触底加载） */
   useEffect(() => {
     const el = document.getElementById(SCROLLER_ID)
     const checkAndLoad = () => {
-      if (loadingRef.current || bottom[channel] || dead[channel]) return
+      if (openNote || loadingRef.current || bottom[channel] || dead[channel]) return
 
       let distanceToBottom = 9999
       if (el && el.scrollHeight > el.clientHeight) {
@@ -320,7 +324,9 @@ export default function Explore() {
           </div>
         ) : (
           <>
-            <Waterfall notes={list} onOpen={setOpenNote} />
+            <div key={channel} className="feed-transition-wrap">
+              <Waterfall notes={list} onOpen={setOpenNote} />
+            </div>
             <div
               className="loadmore-trigger"
               onClick={() => {

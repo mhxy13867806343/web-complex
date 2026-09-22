@@ -187,20 +187,31 @@
 
 .chip {
   flex: 0 0 auto;
-  padding: 6px 13px;
+  padding: 6px 14px;
   font-size: 13px;
   color: #666;
   background: #f5f5f5;
-  border-radius: 16px;
+  border-radius: 18px;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.chip:hover {
+  background: #ececec;
+  color: #333;
+}
+
+.chip:active {
+  transform: scale(0.93);
 }
 
 .chip.active {
   color: #fff;
   font-weight: 600;
   background: var(--xhs-red);
+  box-shadow: 0 2px 8px rgba(255, 36, 66, 0.32);
+  transform: scale(1.05);
 }
 
 /* 两侧渐隐，提示"这边还有内容" */
@@ -420,12 +431,79 @@
   text-align: center;
 }
 
+/* ---------------- 切换频道平滑过渡动画 ---------------- */
+.feed-transition-wrap {
+  animation: feedFadeSlide 0.26s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+@keyframes feedFadeSlide {
+  from {
+    opacity: 0.3;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------- 弹窗丝滑抽屉平移动画 ---------------- */
+.nut-popup-bottom {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1) !important;
+}
+
 /* ---------------- 笔记详情 ---------------- */
 .detail {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   background: #fff;
+}
+
+/* 顶部浮动导航栏（左侧返回 + 右侧关闭） */
+.detail-top-nav {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 14px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.detail-nav-btn {
+  pointer-events: auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.15s ease, background 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+}
+
+.detail-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.78);
+  transform: scale(1.08);
+}
+
+.detail-nav-btn:active {
+  transform: scale(0.92);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 .detail-scroll {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Popup } from '@nutui/nutui-react'
 import {
   ArrowLeft,
@@ -52,8 +52,44 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
   const [isHovered, setIsHovered] = useState(false)
   const isTouching = useRef(false)
 
+  // 平滑关闭动画状态控制：避免 note 突变导致 DOM 瞬间卸载而跳过下滑动画
+  const [activeNote, setActiveNote] = useState<Note | null>(note)
+  const [isClosing, setIsClosing] = useState(false)
+
   useEffect(() => {
-    if (!note) {
+    if (note) {
+      setActiveNote(note)
+      setIsClosing(false)
+    }
+  }, [note])
+
+  const handleClose = useCallback(() => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(() => {
+      onClose()
+      setActiveNote(null)
+      setIsClosing(false)
+    }, 280)
+  }, [isClosing, onClose])
+
+  // 支持键盘 Esc 退出
+  useEffect(() => {
+    if (!activeNote || isClosing) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        e.preventDefault()
+        handleClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [activeNote, isClosing, handleClose])
+
+  const currentNote = note || activeNote
+
+  useEffect(() => {
+    if (!currentNote) {
       setDetail(null)
       setComments([])
       setCommentsCount(0)
@@ -68,13 +104,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
     const ac = new AbortController()
 
-    const baseId = note.id.replace(/_p\d+.*$/, '')
+    const baseId = currentNote.id.replace(/_p\d+.*$/, '')
     // 先抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
-    fetchNoteDetail(baseId, note.noteUrl, note, ac.signal)
+    fetchNoteDetail(baseId, currentNote.noteUrl, currentNote, ac.signal)
       .then((detailRes) => {
         setDetail(detailRes)
-        const realTitle = detailRes.title || note.title || ''
-        const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : note.tags || []
+        const realTitle = detailRes.title || currentNote.title || ''
+        const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : currentNote.tags || []
         const realCount = detailRes.interactInfo?.commentCount || ''
         return fetchNoteComments(baseId, realTitle, realTags, realCount, ac.signal)
       })
@@ -90,11 +126,11 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
       })
 
     return () => ac.abort()
-  }, [note])
+  }, [currentNote?.id])
 
-  const isVideo = note ? (note.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl) : false
-  const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (note ? [note.cover] : [])
-  const currentLikes = parseCount(detail?.interactInfo?.likedCount || note?.likes, 0)
+  const isVideo = currentNote ? (currentNote.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl) : false
+  const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (currentNote ? [currentNote.cover] : [])
+  const currentLikes = parseCount(detail?.interactInfo?.likedCount || currentNote?.likes, 0)
   const currentCollects = parseCount(detail?.interactInfo?.collectedCount || '0', collected ? 1 : 0)
 
   // 多图轮播自动滚动（每 3 秒自动滚动到下一张，鼠标悬停或手指按住时自动暂停）
@@ -111,7 +147,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
   // 详情弹窗打开时，锁定主页面背景滚动，杜绝滚动穿透
   useEffect(() => {
-    if (!note) return
+    if (!currentNote || isClosing) return
     const scroller = document.querySelector('#page-body') as HTMLElement | null
     const originalScrollerOverflow = scroller?.style.overflow || ''
     const originalBodyOverflow = document.body.style.overflow || ''
@@ -123,9 +159,9 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
       if (scroller) scroller.style.overflow = originalScrollerOverflow
       document.body.style.overflow = originalBodyOverflow
     }
-  }, [note])
+  }, [currentNote, isClosing])
 
-  if (!note) return null
+  if (!currentNote) return null
 
   const onTouchStart = (e: React.TouchEvent) => {
     isTouching.current = true
@@ -159,16 +195,62 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
   return (
     <Popup
-      visible={!!note}
+      visible={!!note && !isClosing}
       position="bottom"
-      closeable
-      closeIconPosition="top-left"
-      closeIcon={<ArrowLeft width={20} height={20} />}
+      closeable={false}
       style={{ height: '100%', maxHeight: '100%' }}
       lockScroll={true}
-      onClose={onClose}
+      closeOnOverlayClick={true}
+      duration={280}
+      onClose={handleClose}
     >
-      <div className="detail">
+      <div
+        className={`detail${isClosing ? ' is-closing' : ''}`}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseMove={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+      >
+        {/* 顶部悬浮导航区：左侧返回箭头 + 右侧关闭按钮，磨砂黑底 + 白色高光图标，任何背景下一清二楚 */}
+        <div className="detail-top-nav">
+          <button
+            type="button"
+            className="detail-nav-btn detail-nav-back"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClose()
+            }}
+            aria-label="返回上一页"
+          >
+            <ArrowLeft width={20} height={20} color="#ffffff" />
+          </button>
+          <button
+            type="button"
+            className="detail-nav-btn detail-nav-close"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClose()
+            }}
+            aria-label="关闭详情"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
         <div className="detail-scroll">
           {/* 顶部媒体区：视频直接播放 / 图集多图轮播（含 2/5、小圆点、自动滚动） */}
           <div className="detail-media-container">
@@ -177,7 +259,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                 <video
                   className="detail-video-player"
                   src={getVideoSrc(detail.videoUrl)}
-                  poster={note.cover}
+                  poster={currentNote.cover}
                   controls
                   autoPlay
                   playsInline
@@ -187,8 +269,8 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
               <div className="detail-video-wrap">
                 <img
                   className="detail-cover-img"
-                  src={note.cover}
-                  alt={note.title}
+                  src={currentNote.cover}
+                  alt={currentNote.title}
                   referrerPolicy="no-referrer"
                   onError={() => setCoverBroken(true)}
                 />
@@ -218,7 +300,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                       ) : (
                         <img
                           src={src}
-                          alt={note.title}
+                          alt={currentNote.title}
                           referrerPolicy="no-referrer"
                           onError={() => setCoverBroken(true)}
                         />
@@ -268,7 +350,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
           {/* 笔记正文与话题 */}
           <div className="detail-body">
-            <h2 className="detail-title">{note.title}</h2>
+            <h2 className="detail-title">{currentNote.title}</h2>
 
             <div className="detail-tags">
               <span className="detail-tag">{isVideo ? '视频笔记' : '图文笔记'}</span>
@@ -304,7 +386,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
               </span>
               <a
                 className="btn-open-link"
-                href={note.noteUrl}
+                href={currentNote.noteUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => Toast.show({ content: '跳转小红书原站', duration: 1.2 })}
@@ -316,20 +398,20 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
           {/* 作者信息栏 */}
           <div className="detail-author">
-            {avatarBroken || !note.author.avatar ? (
+            {avatarBroken || !currentNote.author.avatar ? (
               <span className="avatar-emoji" style={{ background: '#f0f0f0' }}>
-                {note.author.name.slice(0, 1)}
+                {currentNote.author.name.slice(0, 1)}
               </span>
             ) : (
               <img
                 className="avatar-img avatar-img-lg"
-                src={detail?.user?.avatar || note.author.avatar}
+                src={detail?.user?.avatar || currentNote.author.avatar}
                 alt=""
                 referrerPolicy="no-referrer"
                 onError={() => setAvatarBroken(true)}
               />
             )}
-            <span className="detail-author-name">{detail?.user?.name || note.author.name}</span>
+            <span className="detail-author-name">{detail?.user?.name || currentNote.author.name}</span>
             <button
               className={`btn-follow${following ? ' following' : ''}`}
               onClick={() => {

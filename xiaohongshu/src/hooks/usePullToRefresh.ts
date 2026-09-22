@@ -14,7 +14,8 @@ export const PTR_TRIGGER = 55
  */
 export function usePullToRefresh(
   selector: string,
-  onRefresh: () => Promise<unknown> | unknown
+  onRefresh: () => Promise<unknown> | unknown,
+  enabled = true
 ) {
   const [distance, setDistance] = useState(0)
   const [pulling, setPulling] = useState(false)
@@ -26,6 +27,12 @@ export function usePullToRefresh(
   }, [onRefresh])
 
   useEffect(() => {
+    if (!enabled) {
+      setDistance(0)
+      setPulling(false)
+      return
+    }
+
     const el = document.querySelector<HTMLElement>(selector)
     if (!el) return
 
@@ -36,6 +43,7 @@ export function usePullToRefresh(
     let dirLock: 'vertical' | 'horizontal' | null = null
 
     const begin = (x: number, y: number) => {
+      if (!enabled) return
       if (el.scrollTop > 0) return
       active = true
       startX = x
@@ -107,11 +115,13 @@ export function usePullToRefresh(
 
     // ---- 触摸 ----
     const onTouchStart = (e: TouchEvent) => {
-      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop')) return
+      if (!enabled) return
+      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop, .nut-popup, .nut-popup-mask, .detail, .nut-overlay')) return
       const t = e.touches[0]
       begin(t.clientX, t.clientY)
     }
     const onTouchMove = (e: TouchEvent) => {
+      if (!enabled) return
       const t = e.touches[0]
       move(t.clientX, t.clientY, () => {
         if (e.cancelable) e.preventDefault()
@@ -124,8 +134,8 @@ export function usePullToRefresh(
 
     // ---- 鼠标（桌面预览调试用）----
     const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop')) return
+      if (!enabled || e.button !== 0) return
+      if ((e.target as HTMLElement)?.closest('.chips-wrap, .chips, button, input, .nut-searchbar, .nut-backtop, .nut-popup, .nut-popup-mask, .detail, .nut-overlay')) return
       begin(e.clientX, e.clientY)
     }
     const onMouseMove = (e: MouseEvent) => move(e.clientX, e.clientY, null)
