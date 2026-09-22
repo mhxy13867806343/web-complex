@@ -80,13 +80,16 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
 
     const ac = new AbortController()
 
-    // 并行请求详情与评论
-    Promise.all([
-      fetchNoteDetail(note.id, note.noteUrl, ac.signal),
-      fetchNoteComments(note.id, note.title, ac.signal),
-    ])
-      .then(([detailRes, commentsRes]) => {
+    // 先抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
+    fetchNoteDetail(note.id, note.noteUrl, ac.signal)
+      .then((detailRes) => {
         setDetail(detailRes)
+        const realTitle = detailRes.title || note.title || ''
+        const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : note.tags || []
+        const realCount = detailRes.interactInfo?.commentCount || ''
+        return fetchNoteComments(note.id, realTitle, realTags, realCount, ac.signal)
+      })
+      .then((commentsRes) => {
         setComments(commentsRes.comments)
         setCommentsCount(commentsRes.count || commentsRes.comments.length)
       })

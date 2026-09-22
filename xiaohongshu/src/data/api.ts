@@ -120,15 +120,19 @@ export async function fetchNoteDetail(
   }
 }
 
-/** 获取笔记评论列表（支持主评论、二级回复嵌套与点赞） */
+/** 获取笔记评论列表（支持根据笔记主题动态匹配、主评论、二级回复嵌套与点赞） */
 export async function fetchNoteComments(
   noteId: string,
   title?: string,
+  tags?: string[],
+  commentCount?: string,
   signal?: AbortSignal
 ): Promise<{ count: number; comments: import('./index').CommentItem[] }> {
   const base = getApiBase()
   const qs = new URLSearchParams({ note_id: noteId })
   if (title) qs.set('title', title)
+  if (tags && tags.length > 0) qs.set('tags', tags.join(','))
+  if (commentCount) qs.set('comment_count', commentCount)
   const path = `/api/xhs/comments?${qs.toString()}`
   const url = base ? `${base.replace(/\/$/, '')}${path}` : path
 
