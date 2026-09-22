@@ -117,10 +117,39 @@ function send(res, code, data) {
 /** 抓一个流（推荐 or 频道）。
  * @param fresh 为 true 时绕过短缓存、现抓一批新笔记（上拉加载用）。
  *              小红书推荐流是随机的，所以 fresh 每次都能拿到和上次不一样的内容。 */
-async function fetchFeed(channel, fresh = false) {
-  if (!fresh) {
+async function loadStaticFallbackFeed(channel) {
+  try {
+    const file = path.resolve(ROOT, 'www/api', `homefeed-${channel}.json`)
+    const text = await fs.readFile(file, 'utf-8')
+    const json = JSON.parse(text)
+    return json.notes || []
+  } catch {
+    return []
+  }
+}
+
+function paginateFeedData(data, pagination) {
+  if (!pagination) return data
+  const { page = 1, pageSize = 10 } = pagination
+  const start = (page - 1) * pageSize
+  const pagedNotes = start < data.notes.length ? data.notes.slice(start, start + pageSize) : []
+  return {
+    ...data,
+    page,
+    pageSize,
+    total: data.notes.length,
+    count: pagedNotes.length,
+    notes: pagedNotes,
+  }
+}
+
+async function fetchFeed(channel, fresh = false, pagination = null) {
+  const isLoadMore = pagination && pagination.action === 'loadmore' && pagination.page > 1
+  if (!fresh || isLoadMore) {
     const hit = feedCache.get(channel)
-    if (hit && Date.now() - hit.at < FEED_CACHE_MS) return { ...hit.data, cached: true }
+    if (hit && (isLoadMore || Date.now() - hit.at < FEED_CACHE_MS)) {
+      return paginateFeedData(hit.data, pagination)
+    }
   }
 
   let url = EXPLORE_URL
@@ -135,19 +164,33 @@ async function fetchFeed(channel, fresh = false) {
 
   const cookie = await getCookie()
   const r = await probeRetry(url, cookie)
+  let rawNotes = []
   if (!r.ok) {
     // 重试仍失败：优先返回上一次抓到的好数据，让页面继续有内容，
     // 而不是直接 502 让前端显示「接口不可用」。内存 → 磁盘 依次兜底。
     const stale = feedCache.get(channel)?.data
     if (stale) {
       console.warn(`[api/xhs] ${channel} 抓取失败（HTTP ${r.status}），用内存里的上一次数据顶上`)
-      return { ...stale, cached: true, stale: true }
+      return paginateFeedData({ ...stale, cached: true, stale: true }, pagination)
     }
     const disk = await readDisk('feed:' + channel)
     if (disk) {
       console.warn(`[api/xhs] ${channel} 抓取失败（HTTP ${r.status}），用磁盘缓存顶上`)
       feedCache.set(channel, { at: Date.now(), data: disk })
-      return { ...disk, cached: true, stale: true }
+      return paginateFeedData({ ...disk, cached: true, stale: true }, pagination)
+    }
+    const fallback = await loadStaticFallbackFeed(channel)
+    if (fallback.length) {
+      const fbData = {
+        channel,
+        channelId,
+        fetchedAt: new Date().toISOString(),
+        count: fallback.length,
+        notes: fallback,
+        cached: true,
+        stale: true,
+      }
+      return paginateFeedData(fbData, pagination)
     }
     throw Object.assign(
       new Error(
@@ -159,17 +202,23 @@ async function fetchFeed(channel, fresh = false) {
     )
   }
 
-  const notes = extractFeeds(r.state).map(normalizeFeedItem).filter(Boolean)
+  rawNotes = extractFeeds(r.state).map(normalizeFeedItem).filter(Boolean)
+  const staticNotes = await loadStaticFallbackFeed(channel)
+  const mergedMap = new Map()
+  for (const n of rawNotes) mergedMap.set(n.id, n)
+  for (const n of staticNotes) if (!mergedMap.has(n.id)) mergedMap.set(n.id, n)
+  const allNotes = Array.from(mergedMap.values())
+
   const data = {
     channel,
     channelId,
     fetchedAt: new Date().toISOString(),
-    count: notes.length,
-    notes,
+    count: allNotes.length,
+    notes: allNotes,
   }
   feedCache.set(channel, { at: Date.now(), data })
   void writeDisk('feed:' + channel, data)
-  return { ...data, cached: false }
+  return paginateFeedData({ ...data, cached: false }, pagination)
 }
 
 /** 抓取单篇笔记详情（多图列表、视频播放源、正文描述、话题标签、点赞数等） */
@@ -605,7 +654,11 @@ export function buildXhsHandler() {
       if (u.pathname === '/feed') {
         const channel = u.searchParams.get('channel') || '推荐'
         const fresh = u.searchParams.get('fresh') === '1'
-        const data = await fetchFeed(channel, fresh)
+        const hasPage = u.searchParams.has('page')
+        const page = Math.max(1, parseInt(u.searchParams.get('page') || '1', 10))
+        const pageSize = Math.max(1, parseInt(u.searchParams.get('pageSize') || '10', 10))
+        const action = u.searchParams.get('action') || 'refresh'
+        const data = await fetchFeed(channel, fresh, hasPage ? { page, pageSize, action } : null)
         return send(res, 200, data)
       }
       if (u.pathname === '/channels') {

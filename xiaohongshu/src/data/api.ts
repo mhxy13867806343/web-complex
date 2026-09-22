@@ -137,6 +137,7 @@ export async function fetchFeed(
   const qs = new URLSearchParams({ channel: ch })
   if (opts.more) qs.set('fresh', '1')
   qs.set('page', String(page))
+  qs.set('pageSize', '10')
   qs.set('action', opts.more ? 'loadmore' : 'refresh')
   qs.set('t', String(Date.now()))
   const path = `/api/xhs/feed?${qs.toString()}`

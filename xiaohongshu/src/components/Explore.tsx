@@ -109,7 +109,15 @@ export default function Explore() {
           const added = next.length - cur.length
           feedsRef.current[ch] = next.slice(0, CAP)
           setFeeds((prev) => ({ ...prev, [ch]: next.slice(0, CAP) }))
-          // 重新有数据了，撤销「到底」标记
+          if (mode === 'more' && added === 0) {
+            // 没有更多新笔记可追加了（已全部加载完毕），标记到底并停止重复触发加载
+            setBottom((prev) => ({ ...prev, [ch]: true }))
+            if (!silent) {
+              Toast.show({ content: '已经到底了', duration: 1.5 })
+            }
+            return 0
+          }
+          // 重新有新数据了，撤销「到底」标记
           setBottom((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
           setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
           if (added > 0 && !silent) {
@@ -121,7 +129,7 @@ export default function Explore() {
           return added
         }
         if (mode === 'more') setBottom((prev) => ({ ...prev, [ch]: true }))
-        if (!silent) Toast.show({ content: '暂时没有更多了', duration: 1.5 })
+        if (!silent) Toast.show({ content: '已经到底了', duration: 1.5 })
         return 0
       } catch (e) {
         if ((e as Error).name === 'AbortError') return 0

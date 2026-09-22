@@ -1667,14 +1667,14 @@ export function getStaticFeed(channel: string, page = 1, pageSize = 20): FeedRes
     pool = STATIC_FEEDS["推荐"] || [];
   }
   
-  // 模拟分页与轮转加载
+  // 真实分页：超出当前池范围则返回空数组，通知前端到底
   const total = pool.length;
-  const start = ((page - 1) * pageSize) % total;
-  let notes: Note[] = [];
-  if (total > 0) {
-    for (let i = 0; i < Math.min(pageSize, total); i++) {
-      const idx = (start + i) % total;
-      notes.push(pool[idx]);
+  const start = (page - 1) * pageSize;
+  const notes: Note[] = [];
+  if (total > 0 && start < total) {
+    const end = Math.min(start + pageSize, total);
+    for (let i = start; i < end; i++) {
+      notes.push(pool[i]);
     }
   }
 

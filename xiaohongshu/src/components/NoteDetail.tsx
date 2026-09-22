@@ -68,14 +68,15 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
     const ac = new AbortController()
 
+    const baseId = note.id.replace(/_p\d+.*$/, '')
     // 先抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
-    fetchNoteDetail(note.id, note.noteUrl, note, ac.signal)
+    fetchNoteDetail(baseId, note.noteUrl, note, ac.signal)
       .then((detailRes) => {
         setDetail(detailRes)
         const realTitle = detailRes.title || note.title || ''
         const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : note.tags || []
         const realCount = detailRes.interactInfo?.commentCount || ''
-        return fetchNoteComments(note.id, realTitle, realTags, realCount, ac.signal)
+        return fetchNoteComments(baseId, realTitle, realTags, realCount, ac.signal)
       })
       .then((commentsRes) => {
         setComments(commentsRes.comments)
@@ -108,6 +109,22 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
     return () => clearInterval(timer)
   }, [images.length, isVideo, isHovered])
 
+  // 详情弹窗打开时，锁定主页面背景滚动，杜绝滚动穿透
+  useEffect(() => {
+    if (!note) return
+    const scroller = document.querySelector('#page-body') as HTMLElement | null
+    const originalScrollerOverflow = scroller?.style.overflow || ''
+    const originalBodyOverflow = document.body.style.overflow || ''
+
+    if (scroller) scroller.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      if (scroller) scroller.style.overflow = originalScrollerOverflow
+      document.body.style.overflow = originalBodyOverflow
+    }
+  }, [note])
+
   if (!note) return null
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -139,23 +156,6 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
     }
     return rawUrl.replace(/^http:/, 'https:')
   }
-
-
-  // 详情弹窗打开时，锁定主页面背景滚动，杜绝滚动穿透
-  useEffect(() => {
-    if (!note) return
-    const scroller = document.querySelector('#page-body') as HTMLElement | null
-    const originalScrollerOverflow = scroller?.style.overflow || ''
-    const originalBodyOverflow = document.body.style.overflow || ''
-
-    if (scroller) scroller.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      if (scroller) scroller.style.overflow = originalScrollerOverflow
-      document.body.style.overflow = originalBodyOverflow
-    }
-  }, [note])
 
   return (
     <Popup
