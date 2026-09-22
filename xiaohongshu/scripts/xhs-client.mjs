@@ -101,6 +101,14 @@ export function normalizeFeedItem(item) {
   const title = (card.displayTitle || card.title || '').trim()
   if (!cover || !title) return null
   const user = card.user || {}
+  const avatar = user.avatar || ''
+  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
+  const userId = user.userId || user.id || (avatarIdMatch ? avatarIdMatch[1] : '')
+  const userToken = user.xsecToken || item.xsecToken || ''
+  const userUrl = userId
+    ? `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${userToken}&xsec_source=pc_feed`
+    : ''
+
   return {
     id: item.id,
     title,
@@ -112,7 +120,10 @@ export function normalizeFeedItem(item) {
     likes: (card.interactInfo && card.interactInfo.likedCount) || '0',
     author: {
       name: user.nickname || user.nickName || '小红书用户',
-      avatar: user.avatar || '',
+      avatar,
+      userId,
+      userUrl,
+      xsecToken: userToken,
     },
     // 带上 xsec_token 才是可访问的原站链接
     noteUrl: `https://www.xiaohongshu.com/explore/${item.id}?xsec_token=${item.xsecToken || ''}&xsec_source=pc_feed`,

@@ -4,6 +4,20 @@
  * 全部改由运行时的 /api/xhs/* 实时抓取，见 ./api.ts。
  */
 
+export interface Author {
+  name: string
+  avatar: string
+  userId?: string
+  userUrl?: string
+  xsecToken?: string
+  redId?: string
+  ipLocation?: string
+  desc?: string
+  follows?: string
+  fans?: string
+  likedAndCollected?: string
+}
+
 /** 单条笔记（字段来自小红书探索页 SSR 的真实数据） */
 export interface Note {
   id: string
@@ -15,10 +29,7 @@ export interface Note {
   type: 'normal' | 'video'
   /** 点赞数，原样保留「3.5万」这类格式 */
   likes: string
-  author: {
-    name: string
-    avatar: string
-  }
+  author: Author
   /** 原站笔记链接（含 xsec_token） */
   noteUrl: string
   /** 详情扩展字段（可选） */
@@ -26,6 +37,22 @@ export interface Note {
   imageList?: string[]
   videoUrl?: string
   tags?: string[]
+}
+
+export interface UserProfileData {
+  userId: string
+  name: string
+  avatar: string
+  redId: string
+  ipLocation?: string
+  desc?: string
+  tags?: string[]
+  gender?: 'female' | 'male' | 'unknown'
+  follows: string
+  fans: string
+  likedAndCollected: string
+  userUrl: string
+  notes?: Note[]
 }
 
 export interface NoteDetailData {

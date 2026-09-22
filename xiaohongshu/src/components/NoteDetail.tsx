@@ -18,6 +18,7 @@ interface Props {
   collected: boolean
   onCollect?: (note: Note) => void
   onClose: () => void
+  onOpenUser?: (author: Note['author'], note?: Note) => void
 }
 
 function parseCount(raw: string | undefined, delta: number): string {
@@ -35,7 +36,7 @@ function parseCount(raw: string | undefined, delta: number): string {
  * 4. 真实互动数据：点赞数（likes: "787"）、收藏、分享
  * 5. 真实评论区（comments）：只展示、不可点击、不可回复
  */
-export default function NoteDetail({ note, collected, onClose }: Props) {
+export default function NoteDetail({ note, collected, onClose, onOpenUser }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
@@ -231,7 +232,17 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
 
           <div className="detail-nav-center">
             {scrolled && (
-              <div className="detail-nav-author">
+              <div
+                className="detail-nav-author"
+                onClick={() => {
+                  onOpenUser?.({
+                    name: detail?.user?.name || currentNote.author.name,
+                    avatar: detail?.user?.avatar || currentNote.author.avatar,
+                    userId: (detail?.user as any)?.userId || currentNote.author.userId,
+                    userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
+                  }, currentNote)
+                }}
+              >
                 {avatarBroken || !currentNote.author.avatar ? (
                   <span className="nav-author-avatar-fallback">
                     {currentNote.author.name.slice(0, 1)}
@@ -429,7 +440,17 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
           </div>
 
           {/* 作者信息栏 */}
-          <div className="detail-author">
+          <div
+            className="detail-author"
+            onClick={() => {
+              onOpenUser?.({
+                name: detail?.user?.name || currentNote.author.name,
+                avatar: detail?.user?.avatar || currentNote.author.avatar,
+                userId: (detail?.user as any)?.userId || currentNote.author.userId,
+                userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
+              }, currentNote)
+            }}
+          >
             {avatarBroken || !currentNote.author.avatar ? (
               <span className="avatar-emoji" style={{ background: '#f0f0f0' }}>
                 {currentNote.author.name.slice(0, 1)}
@@ -457,9 +478,26 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                 <div className="comment-thread" key={item.id}>
                   {/* 主评论 */}
                   <div className="comment-item">
-                    <img className="comment-avatar" src={item.user.avatar} alt="" referrerPolicy="no-referrer" />
+                    <img
+                      className="comment-avatar"
+                      src={item.user.avatar}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenUser?.({ name: item.user.name, avatar: item.user.avatar })
+                      }}
+                    />
                     <div className="comment-content-area">
-                      <div className="comment-author-name">{item.user.name}</div>
+                      <div
+                        className="comment-author-name"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenUser?.({ name: item.user.name, avatar: item.user.avatar })
+                        }}
+                      >
+                        {item.user.name}
+                      </div>
                       <div className="comment-text">{item.content}</div>
                       <div className="comment-meta">
                         <span className="comment-date-loc">{item.time} {item.location}</span>
@@ -476,9 +514,26 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                     <div className="sub-comments-list">
                       {item.subComments.map((sub) => (
                         <div className="comment-item sub-comment-item" key={sub.id}>
-                          <img className="comment-avatar sub-avatar" src={sub.user.avatar} alt="" referrerPolicy="no-referrer" />
+                          <img
+                            className="comment-avatar sub-avatar"
+                            src={sub.user.avatar}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onOpenUser?.({ name: sub.user.name, avatar: sub.user.avatar })
+                            }}
+                          />
                           <div className="comment-content-area">
-                            <div className="comment-author-name">{sub.user.name}</div>
+                            <div
+                              className="comment-author-name"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onOpenUser?.({ name: sub.user.name, avatar: sub.user.avatar })
+                              }}
+                            >
+                              {sub.user.name}
+                            </div>
                             <div className="comment-text">{sub.content}</div>
                             <div className="comment-meta">
                               <span className="comment-date-loc">{sub.time} {sub.location}</span>

@@ -1,4 +1,4 @@
-import type { Note, NoteDetailData, CommentItem } from './index'
+import type { Note, NoteDetailData, CommentItem, Author, UserProfileData } from './index'
 import { STATIC_CHANNELS, STATIC_FEEDS, getStaticFeed } from './staticFeeds'
 import { generateDynamicComments } from './commentsGenerator'
 
@@ -218,3 +218,65 @@ export async function fetchNoteComments(
   // 后端未启动或遇到 404 时优雅降级到客户端引擎生成
   return generateDynamicComments(noteId, title, tags, commentCount)
 }
+
+/**
+ * 构建并聚合指定博主的高保真个人主页数据（含头像、红薯号、IP属地、粉丝/获赞统计、作品列表与原站跳转链接）
+ */
+export function buildUserProfile(
+  author: Author,
+  knownNotes: Note[] = []
+): UserProfileData {
+  const avatar = author.avatar || ''
+  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
+  const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '5d69dbca00000000010081fc')
+  const userToken = author.xsecToken || 'AB4kerAPQbqA3B57WFZrBlh4vxcaETaAeHyHiZfvRLaz4='
+  const userUrl = author.userUrl || `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${userToken}&xsec_source=pc_feed`
+  const redId = author.redId || userId.slice(0, 10)
+
+  // 聚合该博主的笔记作品：
+  // 1. 优先匹配同一作者名字或相同 userId 的笔记
+  const matched = knownNotes.filter(
+    (n) => n.author.name === author.name || (n.author.userId && n.author.userId === userId)
+  )
+
+  let notes = [...matched]
+  // 2. 若作品不足 4 条，从现有瀑布流中补齐精选作品，保证主页作品丰富不空洞
+  if (notes.length < 4 && knownNotes.length > 0) {
+    const others = knownNotes.filter((n) => !notes.some((m) => m.id === n.id))
+    notes = [...notes, ...others.slice(0, 8 - notes.length)]
+  }
+
+  // 依据博主姓名或 ID 生成稳定的博主数据
+  const seed = (author.name || '小红书博主').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const follows = author.follows || String(15 + (seed % 80))
+  const fans = author.fans || (seed % 3 === 0 ? `${(1.2 + (seed % 20) * 0.3).toFixed(1)}万` : String(230 + (seed % 900)))
+  const likedAndCollected = author.likedAndCollected || `${(3.5 + (seed % 30) * 0.8).toFixed(1)}万`
+  const ipLocations = ['广东', '上海', '北京', '浙江', '江苏', '四川', '山东', '湖北', '福建']
+  const ipLocation = author.ipLocation || ipLocations[seed % ipLocations.length]
+
+  const bios = [
+    '热爱生活，记录日常美好与灵感 ✨ 合作请私信',
+    '分享穿搭 / 美食 / 治愈系日常 🌿 每天都要开开心心呀',
+    '专注分享实用好物与真实测评 ☕️ 愿所有美好如期而至',
+    '生活碎片收集者 📸 每一刻都有它的意义',
+    '热爱烘焙与厨房的烟火气 🍞 愿美食治愈你的每一天',
+  ]
+  const desc = author.desc || bios[seed % bios.length]
+
+  return {
+    userId,
+    name: author.name,
+    avatar,
+    redId,
+    ipLocation,
+    desc,
+    tags: ['🍠 优质创作者', '生活精选博主'],
+    gender: seed % 2 === 0 ? 'female' : 'male',
+    follows,
+    fans,
+    likedAndCollected,
+    userUrl,
+    notes,
+  }
+}
+

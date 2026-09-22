@@ -5,12 +5,13 @@ import type { Note } from '../data'
 interface Props {
   note: Note
   onOpen: (note: Note) => void
+  onOpenUser?: (author: Note['author'], note: Note) => void
 }
 
 /**
  * 笔记卡片：封面 + 标题 + 作者信息与点赞数展示（"likes": "787"）
  */
-export default function NoteCard({ note, onOpen }: Props) {
+export default function NoteCard({ note, onOpen, onOpenUser }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
 
@@ -46,7 +47,15 @@ export default function NoteCard({ note, onOpen }: Props) {
       <div className="note-body">
         <div className="note-title ellipsis-2">{note.title}</div>
         <div className="note-footer">
-          <div className="note-author">
+          <div
+            className="note-author"
+            onClick={(e) => {
+              if (onOpenUser) {
+                e.stopPropagation()
+                onOpenUser(note.author, note)
+              }
+            }}
+          >
             {avatarBroken || !note.author.avatar ? (
               <span className="note-avatar-fallback">{note.author.name.slice(0, 1)}</span>
             ) : (

@@ -263,6 +263,10 @@ async function fetchNoteDetail(id, noteUrl) {
         user: {
           name: raw.user?.nickname || raw.user?.nickName || '',
           avatar: (raw.user?.avatar || '').replace(/^http:/, 'https:'),
+          userId: raw.user?.userId || raw.user?.id || ((raw.user?.avatar || '').match(/avatar\/([a-f0-9]{24})/i)?.[1] || ''),
+          userUrl: raw.user?.userId
+            ? `https://www.xiaohongshu.com/user/profile/${raw.user.userId}?xsec_token=${raw.user.xsecToken || ''}&xsec_source=pc_feed`
+            : '',
         },
       }
       void writeDisk(diskKey, res)
