@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BackTop, Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
-import type { Note } from '../data'
+import type { Author, Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import ChannelChips from './ChannelChips'
 import NoteDetail from './NoteDetail'
 import { Toast } from './Toast'
+import UserPage from './UserPage'
 import Waterfall from './Waterfall'
 
 const RECOMMEND = '推荐'
@@ -80,6 +81,7 @@ export default function Explore() {
   const [dead, setDead] = useState<Record<string, boolean>>({})
   const [collected, setCollected] = useState<Record<string, boolean>>({})
   const [openNote, setOpenNote] = useState<Note | null>(null)
+  const [activeUser, setActiveUser] = useState<Author | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   /** 每个流已经「到底」的标记 */
   const [bottom, setBottom] = useState<Record<string, boolean>>({})
@@ -325,7 +327,11 @@ export default function Explore() {
         ) : (
           <>
             <div key={channel} className="feed-transition-wrap">
-              <Waterfall notes={list} onOpen={setOpenNote} />
+              <Waterfall
+                notes={list}
+                onOpen={setOpenNote}
+                onOpenUser={(author) => setActiveUser(author)}
+              />
             </div>
             <div
               className="loadmore-trigger"
@@ -363,7 +369,19 @@ export default function Explore() {
         collected={openNote ? !!collected[openNote.id] : false}
         onCollect={toggleCollect}
         onClose={() => setOpenNote(null)}
+        onOpenUser={(author) => setActiveUser(author)}
       />
+
+      {activeUser && (
+        <UserPage
+          author={activeUser}
+          knownNotes={list}
+          onBack={() => setActiveUser(null)}
+          onOpenNote={(note) => {
+            setOpenNote(note)
+          }}
+        />
+      )}
 
       {/* NutUI BackTop 返回顶部 */}
       <BackTop

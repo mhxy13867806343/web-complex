@@ -244,6 +244,42 @@ export function getUserProfileUrl(
 }
 
 /**
+ * 客户端发起真实 HTTP 请求获取博主详情数据与作品流（GET /api/xhs/user?id=...）
+ */
+export async function fetchUserProfileApi(
+  userId: string,
+  author?: Author,
+  fallbackNotes: Note[] = [],
+  signal?: AbortSignal
+): Promise<UserProfileData> {
+  // 静态托管环境（如 GitHub Pages）回退到客户端动态聚合
+  if (isStaticEnvironment()) {
+    return buildUserProfile(author || { name: '小红书博主', avatar: '', userId }, fallbackNotes)
+  }
+
+  const base = getApiBase()
+  const qs = new URLSearchParams()
+  if (userId) qs.set('id', userId)
+  if (author?.name) qs.set('name', author.name)
+  if (author?.avatar) qs.set('avatar', author.avatar)
+  if (author?.xsecToken) qs.set('token', author.xsecToken)
+
+  const path = `/api/xhs/user?${qs.toString()}`
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as UserProfileData
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e
+  }
+
+  return buildUserProfile(author || { name: '小红书博主', avatar: '', userId }, fallbackNotes)
+}
+
+/**
  * 构建并聚合指定博主的高保真个人主页数据（含头像、红薯号、IP属地、粉丝/获赞统计、作品列表与原站跳转链接）
  */
 export function buildUserProfile(

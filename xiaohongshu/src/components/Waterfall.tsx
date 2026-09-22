@@ -5,6 +5,7 @@ import NoteCard from './NoteCard'
 interface Props {
   notes: Note[]
   onOpen: (note: Note) => void
+  onOpenUser?: (author: Note['author'], note: Note) => void
 }
 
 /**
@@ -12,7 +13,7 @@ interface Props {
  * 用每条笔记真实的 coverWidth / coverHeight 估算列高，
  * 按「累计高度最小优先」分列，视觉错落且两列高度接近。
  */
-export default function Waterfall({ notes, onOpen }: Props) {
+export default function Waterfall({ notes, onOpen, onOpenUser }: Props) {
   const columns = useMemo(() => {
     const cols: Note[][] = [[], []]
     const heights = [0, 0]
@@ -31,7 +32,7 @@ export default function Waterfall({ notes, onOpen }: Props) {
       {columns.map((col, i) => (
         <div className="waterfall-col" key={i}>
           {col.map((note) => (
-            <NoteCard key={note.id} note={note} onOpen={onOpen} />
+            <NoteCard key={note.id} note={note} onOpen={onOpen} onOpenUser={onOpenUser} />
           ))}
         </div>
       ))}

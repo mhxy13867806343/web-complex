@@ -18,6 +18,7 @@ interface Props {
   collected: boolean
   onCollect?: (note: Note) => void
   onClose: () => void
+  onOpenUser?: (author: Note['author'], note?: Note) => void
 }
 
 function parseCount(raw: string | undefined, delta: number): string {
@@ -35,7 +36,7 @@ function parseCount(raw: string | undefined, delta: number): string {
  * 4. 真实互动数据：点赞数（likes: "787"）、收藏、分享
  * 5. 真实评论区（comments）：只展示、不可点击、不可回复
  */
-export default function NoteDetail({ note, collected, onClose }: Props) {
+export default function NoteDetail({ note, collected, onClose, onOpenUser }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
@@ -241,9 +242,7 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                     userId: (detail?.user as any)?.userId || currentNote.author.userId,
                     userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
                   }
-                  const url = getUserProfileUrl(author, currentNote.noteUrl)
-                  window.open(url, '_blank', 'noopener,noreferrer')
-                  Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
+                  onOpenUser?.(author, currentNote)
                 }}
               >
                 {avatarBroken || !currentNote.author.avatar ? (
@@ -438,9 +437,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                 userId: (detail?.user as any)?.userId || currentNote.author.userId,
                 userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
               }
-              const url = getUserProfileUrl(author, currentNote.noteUrl)
-              window.open(url, '_blank', 'noopener,noreferrer')
-              Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
+              if (onOpenUser) {
+                onOpenUser(author, currentNote)
+              } else {
+                const url = getUserProfileUrl(author, currentNote.noteUrl)
+                window.open(url, '_blank', 'noopener,noreferrer')
+                Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
+              }
             }}
           >
             <div className="author-card-left">
@@ -500,9 +503,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                       referrerPolicy="no-referrer"
                       onClick={(e) => {
                         e.stopPropagation()
-                        const url = getUserProfileUrl(item.user, currentNote.noteUrl)
-                        window.open(url, '_blank', 'noopener,noreferrer')
-                        Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                        if (onOpenUser) {
+                          onOpenUser(item.user)
+                        } else {
+                          const url = getUserProfileUrl(item.user, currentNote.noteUrl)
+                          window.open(url, '_blank', 'noopener,noreferrer')
+                          Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                        }
                       }}
                     />
                     <div className="comment-content-area">
@@ -510,9 +517,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                         className="comment-author-name"
                         onClick={(e) => {
                           e.stopPropagation()
-                          const url = getUserProfileUrl(item.user, currentNote.noteUrl)
-                          window.open(url, '_blank', 'noopener,noreferrer')
-                          Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                          if (onOpenUser) {
+                            onOpenUser(item.user)
+                          } else {
+                            const url = getUserProfileUrl(item.user, currentNote.noteUrl)
+                            window.open(url, '_blank', 'noopener,noreferrer')
+                            Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                          }
                         }}
                       >
                         {item.user.name}
@@ -540,9 +551,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                             referrerPolicy="no-referrer"
                             onClick={(e) => {
                               e.stopPropagation()
-                              const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
-                              window.open(url, '_blank', 'noopener,noreferrer')
-                              Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                              if (onOpenUser) {
+                                onOpenUser(sub.user)
+                              } else {
+                                const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
+                                window.open(url, '_blank', 'noopener,noreferrer')
+                                Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                              }
                             }}
                           />
                           <div className="comment-content-area">
@@ -550,9 +565,13 @@ export default function NoteDetail({ note, collected, onClose }: Props) {
                               className="comment-author-name"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
-                                window.open(url, '_blank', 'noopener,noreferrer')
-                                Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                                if (onOpenUser) {
+                                  onOpenUser(sub.user)
+                                } else {
+                                  const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
+                                  window.open(url, '_blank', 'noopener,noreferrer')
+                                  Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                                }
                               }}
                             >
                               {sub.user.name}
