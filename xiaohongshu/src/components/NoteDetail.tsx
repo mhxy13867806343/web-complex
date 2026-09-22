@@ -9,7 +9,7 @@ import {
   Star,
 } from '@nutui/icons-react'
 import type { CommentItem, Note, NoteDetailData } from '../data'
-import { fetchNoteComments, fetchNoteDetail } from '../data/api'
+import { fetchNoteComments, fetchNoteDetail, getUserProfileUrl } from '../data/api'
 import { Toast } from './Toast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
@@ -18,7 +18,6 @@ interface Props {
   collected: boolean
   onCollect?: (note: Note) => void
   onClose: () => void
-  onOpenUser?: (author: Note['author'], note?: Note) => void
 }
 
 function parseCount(raw: string | undefined, delta: number): string {
@@ -36,7 +35,7 @@ function parseCount(raw: string | undefined, delta: number): string {
  * 4. 真实互动数据：点赞数（likes: "787"）、收藏、分享
  * 5. 真实评论区（comments）：只展示、不可点击、不可回复
  */
-export default function NoteDetail({ note, collected, onClose, onOpenUser }: Props) {
+export default function NoteDetail({ note, collected, onClose }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
@@ -234,13 +233,17 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
             {scrolled && (
               <div
                 className="detail-nav-author"
-                onClick={() => {
-                  onOpenUser?.({
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const author = {
                     name: detail?.user?.name || currentNote.author.name,
                     avatar: detail?.user?.avatar || currentNote.author.avatar,
                     userId: (detail?.user as any)?.userId || currentNote.author.userId,
                     userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
-                  }, currentNote)
+                  }
+                  const url = getUserProfileUrl(author, currentNote.noteUrl)
+                  window.open(url, '_blank', 'noopener,noreferrer')
+                  Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
                 }}
               >
                 {avatarBroken || !currentNote.author.avatar ? (
@@ -429,12 +432,15 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
           <div
             className="detail-author-card"
             onClick={() => {
-              onOpenUser?.({
+              const author = {
                 name: detail?.user?.name || currentNote.author.name,
                 avatar: detail?.user?.avatar || currentNote.author.avatar,
                 userId: (detail?.user as any)?.userId || currentNote.author.userId,
                 userUrl: (detail?.user as any)?.userUrl || currentNote.author.userUrl,
-              }, currentNote)
+              }
+              const url = getUserProfileUrl(author, currentNote.noteUrl)
+              window.open(url, '_blank', 'noopener,noreferrer')
+              Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
             }}
           >
             <div className="author-card-left">
@@ -494,7 +500,9 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                       referrerPolicy="no-referrer"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onOpenUser?.({ name: item.user.name, avatar: item.user.avatar })
+                        const url = getUserProfileUrl(item.user, currentNote.noteUrl)
+                        window.open(url, '_blank', 'noopener,noreferrer')
+                        Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
                       }}
                     />
                     <div className="comment-content-area">
@@ -502,7 +510,9 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                         className="comment-author-name"
                         onClick={(e) => {
                           e.stopPropagation()
-                          onOpenUser?.({ name: item.user.name, avatar: item.user.avatar })
+                          const url = getUserProfileUrl(item.user, currentNote.noteUrl)
+                          window.open(url, '_blank', 'noopener,noreferrer')
+                          Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
                         }}
                       >
                         {item.user.name}
@@ -530,7 +540,9 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                             referrerPolicy="no-referrer"
                             onClick={(e) => {
                               e.stopPropagation()
-                              onOpenUser?.({ name: sub.user.name, avatar: sub.user.avatar })
+                              const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
+                              window.open(url, '_blank', 'noopener,noreferrer')
+                              Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
                             }}
                           />
                           <div className="comment-content-area">
@@ -538,7 +550,9 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                               className="comment-author-name"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                onOpenUser?.({ name: sub.user.name, avatar: sub.user.avatar })
+                                const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
+                                window.open(url, '_blank', 'noopener,noreferrer')
+                                Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
                               }}
                             >
                               {sub.user.name}

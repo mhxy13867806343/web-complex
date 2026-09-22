@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Heart, Play } from '@nutui/icons-react'
 import type { Note } from '../data'
+import { getUserProfileUrl } from '../data/api'
+import { Toast } from './Toast'
 
 interface Props {
   note: Note
@@ -11,7 +13,7 @@ interface Props {
 /**
  * 笔记卡片：封面 + 标题 + 作者信息与点赞数展示（"likes": "787"）
  */
-export default function NoteCard({ note, onOpen, onOpenUser }: Props) {
+export default function NoteCard({ note, onOpen }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
 
@@ -50,10 +52,10 @@ export default function NoteCard({ note, onOpen, onOpenUser }: Props) {
           <div
             className="note-author"
             onClick={(e) => {
-              if (onOpenUser) {
-                e.stopPropagation()
-                onOpenUser(note.author, note)
-              }
+              e.stopPropagation()
+              const url = getUserProfileUrl(note.author, note.noteUrl)
+              window.open(url, '_blank', 'noopener,noreferrer')
+              Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
             }}
           >
             {avatarBroken || !note.author.avatar ? (

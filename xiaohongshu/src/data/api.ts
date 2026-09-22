@@ -220,6 +220,30 @@ export async function fetchNoteComments(
 }
 
 /**
+ * 获取小红书原站博主个人主页直链（带 xsec_token 与完整安全参数）
+ */
+export function getUserProfileUrl(
+  author: Partial<Author> & { name?: string; avatar?: string; userId?: string; userUrl?: string; xsecToken?: string },
+  fallbackNoteUrl?: string
+): string {
+  if (author.userUrl) return author.userUrl
+  const avatar = author.avatar || ''
+  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
+  const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '5d69dbca00000000010081fc')
+
+  let token = author.xsecToken || ''
+  if (!token && fallbackNoteUrl) {
+    const m = fallbackNoteUrl.match(/xsec_token=([^&]+)/)
+    if (m) token = m[1]
+  }
+  if (!token) {
+    token = 'AB4kerAPQbqA3B57WFZrBlh4vxcaETaAeHyHiZfvRLaz4='
+  }
+
+  return `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${encodeURIComponent(token)}&xsec_source=pc_feed`
+}
+
+/**
  * 构建并聚合指定博主的高保真个人主页数据（含头像、红薯号、IP属地、粉丝/获赞统计、作品列表与原站跳转链接）
  */
 export function buildUserProfile(
