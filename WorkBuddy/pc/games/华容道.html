@@ -263,6 +263,26 @@
     }
   });
 
+  // 触屏滑动支持
+  var tstartX = 0, tstartY = 0;
+  cv.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) return;
+    tstartX = e.touches[0].clientX; tstartY = e.touches[0].clientY;
+    WB.sfx.unlock();
+  }, { passive: true });
+  cv.addEventListener('touchend', function (e) {
+    if (e.changedTouches.length !== 1) return;
+    var dx = e.changedTouches[0].clientX - tstartX;
+    var dy = e.changedTouches[0].clientY - tstartY;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        moveDir(0, dx > 0 ? 1 : -1);
+      } else {
+        moveDir(dy > 0 ? 1 : -1, 0);
+      }
+    }
+  });
+
   // 按键方向 = 方块滑动方向
   var KM = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
   window.addEventListener('keydown', function (e) {

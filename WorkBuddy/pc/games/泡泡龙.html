@@ -364,13 +364,35 @@
     draw();
   }
 
-  cv.addEventListener('mousemove', function (e) {
+  function handlePointerAim(clientX, clientY) {
     var r = cv.getBoundingClientRect();
-    aimAt((e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height));
+    if (r.width > 0 && r.height > 0) {
+      aimAt((clientX - r.left) * (W / r.width), (clientY - r.top) * (H / r.height));
+    }
+  }
+  cv.addEventListener('mousemove', function (e) {
+    handlePointerAim(e.clientX, e.clientY);
+  });
+  cv.addEventListener('touchmove', function (e) {
+    if (e.touches.length > 0) {
+      handlePointerAim(e.touches[0].clientX, e.touches[0].clientY);
+      e.preventDefault();
+    }
+  }, { passive: false });
+  cv.addEventListener('touchstart', function (e) {
+    WB.sfx.unlock();
+    if (e.touches.length > 0) {
+      handlePointerAim(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: true });
+  cv.addEventListener('touchend', function (e) {
+    if (e.changedTouches.length > 0) {
+      handlePointerAim(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      shoot();
+    }
   });
   cv.addEventListener('click', function (e) {
-    var r = cv.getBoundingClientRect();
-    aimAt((e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height));
+    handlePointerAim(e.clientX, e.clientY);
     shoot();
   });
 

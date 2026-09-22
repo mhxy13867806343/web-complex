@@ -37,6 +37,13 @@
   .bike .st { font-size:11px; color:var(--txt-1); line-height:1.6; margin-top:6px; }
   kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
     padding:1px 6px; font-size:12px; font-family:inherit; }
+
+  .touch-controls { display:flex; justify-content:space-between; align-items:center; width:100%; max-width:980px; margin-top:10px; gap:12px; user-select:none; -webkit-user-select:none; }
+  .turn-group, .drive-group { display:flex; gap:8px; }
+  .cbtn { width:66px; height:50px; background:var(--bg-1); border:1px solid var(--line); color:var(--txt-0); border-radius:12px; font-size:13px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; }
+  .cbtn:active, .cbtn.active { background:var(--acc); color:#fff; transform:scale(0.96); }
+  .cbtn.gas { background:rgba(52,211,153,.2); border-color:#34d399; color:#34d399; width:74px; }
+  .cbtn.brake { background:rgba(248,113,113,.2); border-color:#f87171; color:#f87171; width:74px; }
 </style>
 </head>
 <body>
@@ -69,14 +76,25 @@
       <p>在繁忙的城市里当一回外卖骑手：到 <b style="color:#34d399">绿圈</b> 取餐，再送到 <b style="color:#f87171">红圈</b> 顾客手上，
         跟着箭头走、躲开路上的汽车、留意油量（到 <b style="color:#fbbf24">黄色加油站</b> 补油）。<br><br>
         <kbd>W</kbd>/<kbd>↑</kbd> 加速 · <kbd>S</kbd>/<kbd>↓</kbd> 倒车 · <kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>空格</kbd> 刹车<br>
-        限时送达有额外小费，赚钱去车库换更快的摩托！</p>
-      <button class="btn primary" id="btnStart">开始接单</button>
+        <span style="color:var(--acc)">电脑可用键盘控制，手机/触屏可用下方虚拟驾驶按键！</span></p>
+      <button class="btn primary" id="btnStart" style="padding:10px 28px;font-size:16px;">开始接单</button>
     </div>
     <div class="overlay" id="garage">
       <h2>🏍️ 车库</h2>
       <p id="garageMoney">当前收入 ¥0</p>
       <div class="bikes" id="bikeList"></div>
       <button class="btn ghost" id="btnCloseGarage">返回上路</button>
+    </div>
+  </div>
+
+  <div class="touch-controls" id="touchControls">
+    <div class="turn-group" id="turnGroup">
+      <button type="button" class="cbtn" data-k="a">◀ 左转</button>
+      <button type="button" class="cbtn" data-k="d">右转 ▶</button>
+    </div>
+    <div class="drive-group" id="driveGroup">
+      <button type="button" class="cbtn brake" data-k="s">🛑 刹车/倒车</button>
+      <button type="button" class="cbtn gas" data-k="w">🚀 加速</button>
     </div>
   </div>
 </div>
@@ -178,15 +196,51 @@
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
+  // 虚拟驾驶控制按键
+  var touchControls = el('touchControls');
+  if (touchControls) {
+    touchControls.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('.cbtn');
+      if (!b) return;
+      e.preventDefault();
+      WB.sfx.unlock();
+      var k = b.getAttribute('data-k');
+      if (k) keys[k] = true;
+      b.classList.add('active');
+    });
+    window.addEventListener('pointerup', function () {
+      touchControls.querySelectorAll('.cbtn').forEach(function (b) {
+        b.classList.remove('active');
+        var k = b.getAttribute('data-k');
+        if (k) keys[k] = false;
+      });
+    });
+    window.addEventListener('pointercancel', function () {
+      touchControls.querySelectorAll('.cbtn').forEach(function (b) {
+        b.classList.remove('active');
+        var k = b.getAttribute('data-k');
+        if (k) keys[k] = false;
+      });
+    });
+  }
+
   // ---------- 引擎音（随速度变调） ----------
   var actx = null, eng = null, engGain = null;
   function engineStart() {
-    if (actx) return;
+    if (actx) {
+      if (actx.state === 'suspended') {
+        try { var p = actx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+      }
+      return;
+    }
     try {
       var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       actx = new AC(); eng = actx.createOscillator(); engGain = actx.createGain();
       eng.type = 'sawtooth'; eng.frequency.value = 50; engGain.gain.value = 0.0;
       eng.connect(engGain); engGain.connect(actx.destination); eng.start();
+      if (actx.state === 'suspended') {
+        try { var p2 = actx.resume(); if (p2 && p2.catch) p2.catch(function () {}); } catch (e) {}
+      }
     } catch (e) { actx = null; eng = null; engGain = null; }
   }
   function engineUpdate() {

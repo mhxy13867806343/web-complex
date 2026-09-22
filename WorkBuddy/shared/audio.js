@@ -19,7 +19,12 @@
       master.gain.value = 0.35;
       master.connect(ctx.destination);
     }
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') {
+      try {
+        var p = ctx.resume();
+        if (p && typeof p.catch === 'function') p.catch(function () {});
+      } catch (e) {}
+    }
     return ctx;
   }
 

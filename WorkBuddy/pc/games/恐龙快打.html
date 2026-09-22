@@ -17,19 +17,36 @@
   .pill { background:var(--bg-1); border:1px solid var(--line); border-radius:10px; padding:6px 12px;
     font-size:13px; text-align:center; }
   .pill b { font-variant-numeric:tabular-nums; }
-  .overlay { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
-    gap:16px; background:rgba(8,12,22,.88); border-radius:14px; backdrop-filter:blur(4px); text-align:center; padding:20px; }
+  .overlay { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:flex-start;
+    gap:14px; background:rgba(8,12,22,.92); border-radius:14px; backdrop-filter:blur(4px); text-align:center; padding:16px; overflow-y:auto; z-index:10; }
   .overlay.show { display:flex; }
-  .overlay h2 { margin:0; font-size:30px; }
-  .overlay p { margin:0; color:var(--txt-1); font-size:13.5px; line-height:1.9; max-width:560px; }
-  .chars { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  .char { width:150px; padding:12px; background:var(--bg-2); border:1px solid var(--line); border-radius:12px; cursor:pointer; }
-  .char:hover { border-color:var(--acc); transform:translateY(-2px); }
-  .char .dot { width:34px; height:34px; border-radius:50%; margin:0 auto 8px; }
-  .char h4 { margin:0 0 4px; font-size:14px; }
-  .char .st { font-size:11px; color:var(--txt-1); line-height:1.6; }
+  .overlay h2 { margin:0; font-size:24px; }
+  .overlay p { margin:0; color:var(--txt-1); font-size:13px; line-height:1.7; max-width:560px; }
+  .chars { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; max-width:540px; }
+  .char { width:120px; padding:10px; background:var(--bg-2); border:1px solid var(--line); border-radius:12px; cursor:pointer; touch-action:manipulation; }
+  .char:hover, .char:active { border-color:var(--acc); transform:translateY(-2px); }
+  .char .dot { width:30px; height:30px; border-radius:50%; margin:0 auto 6px; }
+  .char h4 { margin:0 0 4px; font-size:13px; }
+  .char .st { font-size:10.5px; color:var(--txt-1); line-height:1.5; }
   kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
-    padding:1px 6px; font-size:12px; font-family:inherit; }
+    padding:1px 6px; font-size:11px; font-family:inherit; }
+
+  .touch-controls { display:flex; justify-content:space-between; align-items:center; width:100%; max-width:980px; margin-top:10px; gap:12px; user-select:none; -webkit-user-select:none; }
+  .dpad { position:relative; width:126px; height:126px; flex-shrink:0; }
+  .dbtn { position:absolute; width:42px; height:42px; background:var(--bg-1); border:1px solid var(--line); color:var(--txt-0); border-radius:10px; font-size:16px; font-weight:bold; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; }
+  .dbtn.up { top:0; left:42px; }
+  .dbtn.down { bottom:0; left:42px; }
+  .dbtn.left { top:42px; left:0; }
+  .dbtn.right { top:42px; right:0; }
+  .dbtn:active, .dbtn.active { background:var(--acc); color:#fff; }
+
+  .act-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:180px; flex-shrink:0; }
+  .abtn { height:46px; background:var(--bg-1); border:1px solid var(--line); color:var(--txt-0); border-radius:10px; font-size:12.5px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; }
+  .abtn:active { transform:scale(0.95); }
+  .abtn.btn-atk { background:rgba(79,140,255,.2); border-color:#4f8cff; color:#4f8cff; }
+  .abtn.btn-jmp { background:rgba(52,211,153,.2); border-color:#34d399; color:#34d399; }
+  .abtn.btn-pik { background:rgba(250,204,21,.2); border-color:#facc15; color:#facc15; }
+  .abtn.btn-spc { background:rgba(248,113,113,.2); border-color:#f87171; color:#f87171; }
 </style>
 </head>
 <body>
@@ -56,14 +73,29 @@
       <h2>🦖 恐龙快打</h2>
       <p>末世街头，匪徒与恐龙横行。一路向右打过去，清完杂兵、干掉关底<b style="color:#f87171">暴龙</b>！<br>
         捡 <b style="color:#34d399">🍗血瓶</b> 回血，捡 <b style="color:#fbbf24">🔫机枪 / 🔥火焰器</b> 火力压制。<br>
-        <kbd>←→↑↓</kbd>/<kbd>WASD</kbd> 移动 · <kbd>J</kbd> 攻击(连按出连招) · <kbd>K</kbd> 跳跃 · <kbd>L</kbd> 拾取 · <kbd>J</kbd>+<kbd>K</kbd> 特殊技(耗血范围攻击)<br>
-        <b>选择你的角色：</b></p>
+        <span style="color:var(--acc)">电脑可用 WASD/J/K/L，手机/触屏可用屏幕下方虚拟摇杆与按键！</span><br>
+        <b>选择你的角色开始游戏：</b></p>
       <div class="chars" id="charList"></div>
     </div>
     <div class="overlay" id="over">
       <h2 id="overT">游戏结束</h2>
       <p id="overP"></p>
       <button class="btn primary" id="btnAgain">再来一局</button>
+    </div>
+  </div>
+
+  <div class="touch-controls" id="touchControls">
+    <div class="dpad" id="dpad">
+      <button type="button" class="dbtn up" data-k="w">▲</button>
+      <button type="button" class="dbtn left" data-k="a">◀</button>
+      <button type="button" class="dbtn down" data-k="s">▼</button>
+      <button type="button" class="dbtn right" data-k="d">▶</button>
+    </div>
+    <div class="act-btns" id="actBtns">
+      <button type="button" class="abtn btn-atk" data-act="attack">👊 攻击</button>
+      <button type="button" class="abtn btn-jmp" data-act="jump">🦘 跳跃</button>
+      <button type="button" class="abtn btn-pik" data-act="pickup">🍗 拾取</button>
+      <button type="button" class="abtn btn-spc" data-act="special">💥 绝招</button>
     </div>
   </div>
 </div>
@@ -563,6 +595,53 @@
     d.onclick = function () { el('menu').classList.remove('show'); newGame(i); WB.sfx.play('start'); };
     charList.appendChild(d);
   });
+
+  // 虚拟方向按键控制
+  var dpad = el('dpad');
+  if (dpad) {
+    var activeKey = null;
+    function setDpadKey(k, pressed) {
+      if (k) keys[k] = !!pressed;
+    }
+    dpad.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('.dbtn');
+      if (!b) return;
+      e.preventDefault();
+      WB.sfx.unlock();
+      var k = b.getAttribute('data-k');
+      b.classList.add('active');
+      setDpadKey(k, true);
+    });
+    window.addEventListener('pointerup', function () {
+      dpad.querySelectorAll('.dbtn').forEach(function (b) {
+        b.classList.remove('active');
+        setDpadKey(b.getAttribute('data-k'), false);
+      });
+    });
+    window.addEventListener('pointercancel', function () {
+      dpad.querySelectorAll('.dbtn').forEach(function (b) {
+        b.classList.remove('active');
+        setDpadKey(b.getAttribute('data-k'), false);
+      });
+    });
+  }
+
+  // 虚拟动作按键控制
+  var actBtns = el('actBtns');
+  if (actBtns) {
+    actBtns.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('.abtn');
+      if (!b || !running) return;
+      e.preventDefault();
+      WB.sfx.unlock();
+      var act = b.getAttribute('data-act');
+      if (act === 'attack') doAttack();
+      else if (act === 'jump') doJump();
+      else if (act === 'pickup') doPickup();
+      else if (act === 'special') doSpecial();
+    });
+  }
+
   el('btnAgain').onclick = function () { el('over').classList.remove('show'); newGame(cur); };
   el('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
   window.addEventListener('resize', resize);

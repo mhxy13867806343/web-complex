@@ -293,6 +293,7 @@
     return null;
   }
 
+  cv.addEventListener('touchstart', function () { WB.sfx.unlock(); }, { passive: true });
   cv.addEventListener('click', function (e) {
     var r = cv.getBoundingClientRect();
     var mx = (e.clientX - r.left) * (BOARD_W / r.width), my = (e.clientY - r.top) * (BOARD_H / r.height);

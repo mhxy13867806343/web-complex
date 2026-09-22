@@ -10,6 +10,12 @@
     max-width:860px; margin:0 auto; padding:16px 14px 36px; }
   canvas { display:block; border-radius:12px; background:#10141f; }
   .side { display:flex; flex-direction:column; gap:12px; width:180px; }
+  @media (max-width:640px) {
+    .main { flex-direction:column; align-items:center; }
+    .side { width:100%; max-width:320px; flex-direction:row; flex-wrap:wrap; justify-content:space-between; }
+    .side .panel { flex:1 1 45%; }
+    .side .panel.keys { display:none; }
+  }
   .panel { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
   .panel h3 { margin:0 0 8px; font-size:12px; color:var(--txt-1); font-weight:600; letter-spacing:1px; }
   .panel canvas { background:transparent; margin:0 auto; }
@@ -19,11 +25,15 @@
   kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
     padding:1px 6px; font-size:11px; font-family:inherit; }
   .overlay { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
-    gap:14px; background:rgba(8,12,22,.88); border-radius:12px; backdrop-filter:blur(4px); text-align:center; padding:20px; }
+    gap:14px; background:rgba(8,12,22,.88); border-radius:12px; backdrop-filter:blur(4px); text-align:center; padding:20px; z-index:10; }
   .overlay.show { display:flex; }
   .overlay h2 { margin:0; font-size:26px; }
   .overlay p { margin:0; color:var(--txt-1); font-size:13px; line-height:1.8; }
-  .stage { position:relative; }
+  .stage { position:relative; display:flex; flex-direction:column; align-items:center; }
+  .touch-bar { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:12px; width:100%; max-width:320px; user-select:none; -webkit-user-select:none; }
+  .tbtn { flex:1 1 calc(33.33% - 8px); min-width:70px; height:46px; background:var(--bg-1); border:1px solid var(--line); color:var(--txt-0); border-radius:10px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; }
+  .tbtn:active { background:var(--acc); color:#fff; transform:scale(0.96); }
+  .tbtn.primary { background:rgba(79,140,255,.2); border-color:var(--acc); color:var(--acc); }
 </style>
 </head>
 <body>
@@ -39,11 +49,20 @@
 <div class="main">
   <div class="stage">
     <canvas id="cv"></canvas>
+    <div class="touch-bar" id="touchBar">
+      <button type="button" class="tbtn" data-act="hold">📦 暂存</button>
+      <button type="button" class="tbtn" data-act="left">◀ 左移</button>
+      <button type="button" class="tbtn" data-act="rotate">🔄 旋转</button>
+      <button type="button" class="tbtn" data-act="right">▶ 右移</button>
+      <button type="button" class="tbtn" data-act="down">▼ 软降</button>
+      <button type="button" class="tbtn primary" data-act="drop">⏬ 硬降</button>
+    </div>
     <div class="overlay show" id="menu">
       <h2>🧱 俄罗斯方块</h2>
       <p><kbd>←→</kbd> 移动 · <kbd>↓</kbd> 软降 · <kbd>↑</kbd>/<kbd>X</kbd> 旋转 · <kbd>Z</kbd> 反转<br>
-        <kbd>空格</kbd> 硬降 · <kbd>C</kbd> 暂存 · <kbd>P</kbd> 暂停<br>消行升级加速，冲击高分！</p>
-      <button class="btn primary" id="btnStart">开始游戏</button>
+        <kbd>空格</kbd> 硬降 · <kbd>C</kbd> 暂存 · <kbd>P</kbd> 暂停<br>
+        <span style="color:var(--acc)">手机/触屏支持下方虚拟按键及划动手势！</span></p>
+      <button class="btn primary" id="btnStart" style="padding:10px 28px;font-size:16px;">开始游戏</button>
     </div>
     <div class="overlay" id="over">
       <h2 id="overT">游戏结束</h2>
@@ -306,6 +325,56 @@
     else if (k === 'z') rotate(-1);
     else if (k === ' ') { hardDrop(); updateHUD(); }
     else if (k === 'c') doHold();
+  });
+
+  // ---------- 触屏与手势控制 ----------
+  var tbar = el('touchBar');
+  if (tbar) {
+    tbar.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('.tbtn');
+      if (!b) return;
+      e.preventDefault();
+      WB.sfx.unlock();
+      if (!running || paused) return;
+      var act = b.getAttribute('data-act');
+      if (act === 'left') move(-1);
+      else if (act === 'right') move(1);
+      else if (act === 'down') { softDrop(); updateHUD(); }
+      else if (act === 'rotate') rotate(1);
+      else if (act === 'drop') { hardDrop(); updateHUD(); }
+      else if (act === 'hold') doHold();
+    });
+  }
+
+  var touchX = 0, touchY = 0, touchT = 0, moved = false;
+  cv.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) return;
+    var t = e.touches[0];
+    touchX = t.clientX; touchY = t.clientY; touchT = Date.now(); moved = false;
+    WB.sfx.unlock();
+  }, { passive: true });
+  cv.addEventListener('touchmove', function (e) {
+    if (!running || paused || e.touches.length !== 1) return;
+    var t = e.touches[0];
+    var dx = t.clientX - touchX;
+    var dy = t.clientY - touchY;
+    if (Math.abs(dx) > 26) {
+      move(dx > 0 ? 1 : -1);
+      touchX = t.clientX;
+      moved = true;
+    }
+    if (dy > 32) {
+      softDrop(); updateHUD();
+      touchY = t.clientY;
+      moved = true;
+    }
+  }, { passive: true });
+  cv.addEventListener('touchend', function (e) {
+    if (!running || paused) return;
+    var dt = Date.now() - touchT;
+    if (!moved && dt < 280) {
+      rotate(1);
+    }
   });
 
   el('btnStart').onclick = function () { el('menu').classList.remove('show'); newGame(); };

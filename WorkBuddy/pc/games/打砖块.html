@@ -20,6 +20,10 @@
   .overlay p { margin:0; color:var(--txt-1); font-size:13.5px; line-height:1.9; }
   kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
     padding:1px 6px; font-size:12px; font-family:inherit; }
+  .touch-bar { display:flex; gap:10px; justify-content:center; margin-top:12px; width:100%; max-width:480px; user-select:none; -webkit-user-select:none; }
+  .tbtn { flex:1; height:46px; background:var(--bg-1); border:1px solid var(--line); color:var(--txt-0); border-radius:10px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; }
+  .tbtn:active { background:var(--acc); color:#fff; }
+  .tbtn.primary { background:rgba(79,140,255,.2); border-color:var(--acc); color:var(--acc); }
 </style>
 </head>
 <body>
@@ -41,13 +45,18 @@
 
   <div class="stage">
     <canvas id="cv"></canvas>
+    <div class="touch-bar" id="touchBar">
+      <button type="button" class="tbtn" id="btnLeft">◀ 左移</button>
+      <button type="button" class="tbtn primary" id="btnShoot">🚀 发球 / 射击</button>
+      <button type="button" class="tbtn" id="btnRight">▶ 右移</button>
+    </div>
     <div class="overlay show" id="menu">
       <h2>🧱 打砖块</h2>
       <p>移动挡板接住小球，清空全部砖块过关！<br>
         接住掉落道具：<b style="color:#4ade80">E</b> 加宽挡板 · <b style="color:#facc15">M</b> 三球 ·
         <b style="color:#f87171">L</b> 激光 · <b style="color:#60a5fa">S</b> 减速 · <b style="color:#f472b6">+</b> 加命<br>
-        鼠标移动 或 <kbd>←→</kbd> 控制 · <kbd>空格</kbd> 发球/发射激光</p>
-      <button class="btn primary" id="btnStart">开始游戏</button>
+        鼠标/手指滑动 或 <kbd>←→</kbd> 控制 · <kbd>空格</kbd> 或 点击 发球/发射激光</p>
+      <button class="btn primary" id="btnStart" style="padding:10px 28px;font-size:16px;">开始游戏</button>
     </div>
     <div class="overlay" id="over">
       <h2 id="overT">游戏结束</h2>
@@ -384,16 +393,58 @@
     }
   }
 
-  cv.addEventListener('mousemove', function (e) {
+  function updatePointerX(clientX) {
     var rc = cv.getBoundingClientRect();
-    mouseX = (e.clientX - rc.left) / rc.width * VW;
+    if (rc.width > 0) {
+      mouseX = (clientX - rc.left) / rc.width * VW;
+    }
+  }
+
+  cv.addEventListener('mousemove', function (e) {
+    updatePointerX(e.clientX);
   });
-  cv.addEventListener('click', doServeOrShoot);
+  cv.addEventListener('touchmove', function (e) {
+    if (e.touches.length > 0) {
+      updatePointerX(e.touches[0].clientX);
+      e.preventDefault();
+    }
+  }, { passive: false });
+  cv.addEventListener('touchstart', function (e) {
+    WB.sfx.unlock();
+    if (e.touches.length > 0) {
+      updatePointerX(e.touches[0].clientX);
+    }
+  }, { passive: true });
+  cv.addEventListener('click', function (e) {
+    updatePointerX(e.clientX);
+    doServeOrShoot();
+  });
+
+  // 虚拟按键支持
+  var btnLeft = el('btnLeft'), btnRight = el('btnRight'), btnShoot = el('btnShoot');
+  if (btnLeft && btnRight && btnShoot) {
+    var holdTimer = null;
+    function startHold(dir) {
+      clearInterval(holdTimer);
+      if (paddle) mouseX = Math.max(paddle.w / 2, Math.min(VW - paddle.w / 2, mouseX + dir * 26));
+      holdTimer = setInterval(function () {
+        if (paddle) mouseX = Math.max(paddle.w / 2, Math.min(VW - paddle.w / 2, mouseX + dir * 26));
+      }, 30);
+    }
+    function endHold() { clearInterval(holdTimer); }
+    btnLeft.addEventListener('pointerdown', function (e) { e.preventDefault(); WB.sfx.unlock(); startHold(-1); });
+    btnRight.addEventListener('pointerdown', function (e) { e.preventDefault(); WB.sfx.unlock(); startHold(1); });
+    window.addEventListener('pointerup', endHold);
+    window.addEventListener('pointercancel', endHold);
+    btnShoot.addEventListener('click', function (e) { e.preventDefault(); WB.sfx.unlock(); doServeOrShoot(); });
+  }
+
   window.addEventListener('keydown', function (e) {
     var k = e.key.toLowerCase();
     keys[k] = true;
     if (['arrowleft', 'arrowright', ' '].indexOf(k) >= 0) e.preventDefault();
     if (k === ' ') doServeOrShoot();
+    WB.sfx.unlock();
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 

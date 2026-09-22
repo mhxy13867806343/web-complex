@@ -28,6 +28,21 @@ export interface ChannelItem {
   originalId?: string
 }
 
+const CHANNEL_API_MAP: Record<string, string> = {
+  '推荐': 'homefeed_recommend',
+  '穿搭': 'homefeed_fashion',
+  '美食': 'homefeed_food',
+  '彩妆': 'homefeed_cosmetics',
+  '影视': 'homefeed_movie',
+  '职场': 'homefeed_career',
+  '情感': 'homefeed_love',
+  '家居': 'homefeed_household',
+  '游戏': 'homefeed_gaming',
+  '旅行': 'homefeed_travel',
+  '健身': 'homefeed_fitness',
+  '视频': 'homefeed_video',
+}
+
 // 记录各频道的分页状态，用于静态数据下的上拉无限加载
 const channelPageMap = new Map<string, number>()
 
@@ -87,8 +102,9 @@ export async function fetchFeed(
     }
 
     try {
-      // 每次切换 tab 或刷新，均发起真实的同源 Fetch 请求（命名匹配 homefeed）
-      const url = `./api/homefeed-${encodeURIComponent(ch)}.json?t=${Date.now()}&fresh=${opts.more ? 1 : 0}`
+      // 每次切换 tab 或刷新，均发起真实的同源 Fetch 请求（以 homefeed_ 开头匹配搜索）
+      const fileKey = CHANNEL_API_MAP[ch] || 'homefeed_recommend'
+      const url = `./api/${fileKey}.json?t=${Date.now()}&fresh=${opts.more ? 1 : 0}`
       const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
       if (res.ok) {
         const data = (await res.json()) as FeedResult
