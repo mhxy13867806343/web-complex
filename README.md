@@ -65,6 +65,27 @@ web-complex/
 | PC | 俄罗斯方块 | 七种经典方块，旋转硬降，行满消除加速 |
 | PC | 扫雷 | 经典 Windows 规则，翻开避雷，插旗标记，笑脸重开 |
 
+## 开发工具
+
+小红书探索页在 **macOS** 上开发。游戏目录是单文件 HTML，用浏览器直接打开即可。探索页额外需要 Node.js 22、npm、TypeScript、Vite。
+
+| 工具 | 用途 | 官网 | 文档 |
+| --- | --- | --- | --- |
+| macOS | 本机。登录脚本用 `pbpaste` 读剪贴板 | [apple.com/macos](https://www.apple.com/macos/) | [Apple Developer Documentation](https://developer.apple.com/documentation/) |
+| Xcode 命令行工具 | 提供 `git` 等命令 | [developer.apple.com/xcode](https://developer.apple.com/xcode/) | [Command Line Tools 下载](https://developer.apple.com/download/all/?q=command%20line%20tools) |
+| Node.js 22 | 探索页开发与 `server.mjs` | [nodejs.org](https://nodejs.org/) | [Node.js 22 API](https://nodejs.org/docs/latest-v22.x/api/) |
+| npm | 安装依赖（`--legacy-peer-deps`） | [npmjs.com](https://www.npmjs.com/) | [npm 文档](https://docs.npmjs.com/) |
+| TypeScript | 探索页类型检查 | [typescriptlang.org](https://www.typescriptlang.org/) | [手册](https://www.typescriptlang.org/docs/) |
+| Vite | 探索页开发与构建 | [vite.dev](https://vite.dev/) | [指南](https://vite.dev/guide/) |
+| React | 探索页 UI | [react.dev](https://react.dev/) | [参考](https://react.dev/reference/react) |
+| NutUI React | 探索页移动端组件 | [nutui.jd.com/react](https://nutui.jd.com/react/) | [README](https://github.com/jdf2e/nutui-react/blob/master/README_ZH.md) |
+| curl | 抓取小红书（macOS 自带） | [curl.se](https://curl.se/) | [文档](https://curl.se/docs/) |
+| Git / GitHub | 版本与远程仓库 | [git-scm.com](https://git-scm.com/) · [github.com](https://github.com/) | [Git](https://git-scm.com/doc) · [GitHub Docs](https://docs.github.com/) |
+| GitHub Actions / Pages | 推 `main` 后发布静态站 | [Actions](https://github.com/features/actions) · [Pages](https://pages.github.com/) | [Actions 文档](https://docs.github.com/actions) · [Pages 文档](https://docs.github.com/pages) |
+| Chrome | 开发者工具、复制 Cookie | [Chrome](https://www.google.com/chrome/) | [DevTools](https://developer.chrome.com/docs/devtools) |
+| Cursor | 编辑这个仓库 | [cursor.com](https://cursor.com/) | [文档](https://cursor.com/docs) |
+| WorkBuddy | 发布带 Node 接口的在线服务，用来看视频 | [workbuddy.cn](https://www.workbuddy.cn/) | [轻量发布](https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Library/Lightweight-Publish) |
+
 ## 运行方式
 
 ### WorkBuddy 游戏（无需构建）
@@ -87,8 +108,10 @@ npm run dev                       # 终端打印地址（5173 被占会自动顺
 # 或本地生产预览：npm run build && npm run start
 ```
 
-- **在线预览（GitHub Pages）**：[直接体验入口](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)（推到 `main` 后由 `.github/workflows/deploy.yml` 自动构建发布）。笔记地址用 `#/explore/笔记id`，不要写成 `github.io/explore/笔记id`。
-- **全功能独立在线服务**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)（含实时 Node 抓取后端）。
+- **在线预览（GitHub Pages）**：[直接体验入口](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)（推到 `main` 后由 `.github/workflows/deploy.yml` 自动构建发布）。笔记地址用 `#/explore/笔记id`。Pages 是静态包，视频笔记只显示封面。
+- **全功能独立在线服务**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)（含实时 Node 抓取后端，重新发布后才能播视频）。
+
+**看视频（记录时间 2026-09-23 00:27 +08）**：本地 `cd xiaohongshu && npm run dev -- --port 5188`，打开 `http://localhost:5188/?view=mobile#/explore/6a8a4d4a0000000016022bb2`。线上同一条笔记要等 WorkBuddy 用当前 `xiaohongshu/www` 覆盖发布后，才打开 `https://xhs-explore.app.workbuddy.host/?view=mobile#/explore/6a8a4d4a0000000016022bb2`。发布前执行 `npm run build && rm -rf www && cp -r dist www`，`startCmd` 为 `node scripts/server.mjs`。当时线上仍是旧包 `index-BQ5iG-x4.js`，`/api/xhs/note` 为 404。步骤详见 [`xiaohongshu/README.md`](xiaohongshu/README.md)。
 - 桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
 
 ## 实现约定

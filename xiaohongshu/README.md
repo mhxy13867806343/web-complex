@@ -20,6 +20,45 @@
 > **注意**：NutUI React 稳定版（3.x）的 peerDependencies 只声明到 React 18，
 > 安装需要 `--legacy-peer-deps`。实测 React 19.3 下渲染与交互正常。
 
+## 开发工具
+
+本机是 **macOS**（终端为 zsh）。下面这些是这个项目实际用到的工具，官网和文档都列在表里。
+
+| 工具 | 在本项目里做什么 | 官网 | 文档 |
+| --- | --- | --- | --- |
+| macOS | 开发机。`npm run login` 用系统自带的 `pbpaste` 读剪贴板 | [apple.com/macos](https://www.apple.com/macos/) | [Apple Developer Documentation](https://developer.apple.com/documentation/) |
+| Xcode 命令行工具 | macOS 上提供 `git` 等命令行工具 | [developer.apple.com/xcode](https://developer.apple.com/xcode/) | [Command Line Tools](https://developer.apple.com/download/all/?q=command%20line%20tools) |
+| Node.js 22 | 跑 Vite，以及 `node scripts/server.mjs`。GitHub Actions 也用 Node 22 | [nodejs.org](https://nodejs.org/) | [Node.js 22 API](https://nodejs.org/docs/latest-v22.x/api/) |
+| npm | 安装依赖。NutUI 需要 `npm install --legacy-peer-deps` | [npmjs.com](https://www.npmjs.com/) | [npm 文档](https://docs.npmjs.com/) |
+| TypeScript 5.9 | `npm run build` 里先跑 `tsc --noEmit` | [typescriptlang.org](https://www.typescriptlang.org/) | [TypeScript 手册](https://www.typescriptlang.org/docs/) |
+| Vite 7 | `npm run dev` / `npm run build` | [vite.dev](https://vite.dev/) | [Vite 指南](https://vite.dev/guide/) |
+| React 19 | 页面 | [react.dev](https://react.dev/) | [React 参考](https://react.dev/reference/react) |
+| NutUI React 3 | 移动端组件（Toast、Empty、InfiniteLoading 等） | [nutui.jd.com/react](https://nutui.jd.com/react/) | [仓库 README](https://github.com/jdf2e/nutui-react/blob/master/README_ZH.md) |
+| curl | 抓小红书页面。macOS 自带，路径一般是 `/usr/bin/curl`。Node 自带的 `fetch` 会被风控 302 | [curl.se](https://curl.se/) | [curl 文档](https://curl.se/docs/) |
+| Git | 提交与推送 | [git-scm.com](https://git-scm.com/) | [Git 文档](https://git-scm.com/doc) |
+| GitHub | 远程仓库 | [github.com](https://github.com/) | [GitHub Docs](https://docs.github.com/) |
+| GitHub Actions | 推到 `main` 后跑 `.github/workflows/deploy.yml` | [GitHub Actions](https://github.com/features/actions) | [Actions 文档](https://docs.github.com/actions) |
+| GitHub Pages | 静态预览，没有 Node 接口，视频只有封面 | [pages.github.com](https://pages.github.com/) | [Pages 文档](https://docs.github.com/pages) |
+| Chrome | 开发者工具里复制登录 Cookie，对照接口 | [google.com/chrome](https://www.google.com/chrome/) | [Chrome DevTools](https://developer.chrome.com/docs/devtools) |
+| Cursor | 编辑、调试这个仓库 | [cursor.com](https://cursor.com/) | [Cursor 文档](https://cursor.com/docs) |
+| WorkBuddy | 把 `xiaohongshu/` 发布成带 Node 的在线服务 | [workbuddy.cn](https://www.workbuddy.cn/) | [轻量发布](https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Library/Lightweight-Publish) |
+| jsdom | 仅 `npm run smoke` 的渲染冒烟 | [jsdom GitHub](https://github.com/jsdom/jsdom) | [jsdom README](https://github.com/jsdom/jsdom#readme) |
+
+Mac 上从零准备到能看视频：
+
+```bash
+# 还没有 git 时，先装 Xcode 命令行工具
+xcode-select --install
+
+# Node.js 22：用官网安装包，或 nvm
+# https://nodejs.org/
+
+cd xiaohongshu
+npm install --legacy-peer-deps
+npm run dev -- --port 5188
+# 浏览器打开 http://localhost:5188/?view=mobile#/explore/6a8a4d4a0000000016022bb2
+```
+
 ## 快速开始
 
 ```bash
@@ -156,10 +195,34 @@ xiaohongshu/
   - **预览地址**：[https://mhxy13867806343.github.io/web-complex/xiaohongshu/](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)
   - 笔记详情走 hash，例如 `#/explore/笔记id`。GitHub Pages 没有 `/explore/笔记id` 这个文件，写成站点根路径会 404。
   - 已通过仓库 `.github/workflows/deploy.yml` 配置 GitHub Actions 自动构建与发布；
-  - 静态页面采用相对路径 `base: './'` 打包，纯静态环境自动请求独立后端接口服务，并在遇到网络或小红书风控时无缝降级到本地精选兜底数据，确保页面稳定展示。
+  - 静态页面采用相对路径 `base: './'` 打包。`github.io` 上没有 `/api/xhs`，页面用仓库里的精选数据，视频笔记只显示封面。
 - **⚡ 全功能独立服务（Node 实时抓取）**：
   - **在线服务地址**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)
   - 运行 `scripts/server.mjs`，包含静态产物托管与实时 `/api/xhs/*` 抓取后端，刷新页面即时抓取最新笔记。
+
+### 怎么看到视频（2026-09-23 00:27 +08）
+
+视频地址来自 `/api/xhs/note` 返回的 `videoUrl`，播放器再走 `/api/xhs/video` 代理。GitHub Pages 只有静态包，详情里的 `videoUrl` 是空的，所以 `#/explore/6a8a4d4a0000000016022bb2` 和 `#/red_video` 看到的是封面。
+
+本地已经能播。在 `xiaohongshu` 目录执行 `npm run dev -- --port 5188`，打开：
+
+`http://localhost:5188/?view=mobile#/explore/6a8a4d4a0000000016022bb2`
+
+线上 Node 地址要重新发布后才会换成这版。2026-09-23 00:27 检查时，`https://xhs-explore.app.workbuddy.host/` 仍在用旧包 `assets/index-BQ5iG-x4.js`，`/api/xhs/note` 返回 `404`。本机新包是 `xiaohongshu/www` 里的 `assets/index-BJYUPOmq.js`，`www/` 被 git 忽略，推 `main` 只更新 GitHub Pages。
+
+在 WorkBuddy 里覆盖发布已有应用（沿用 `https://xhs-explore.app.workbuddy.host/`，不要新建链接）：
+
+```bash
+cd xiaohongshu
+npm run build
+rm -rf www && cp -r dist www
+```
+
+发布目录用 `/Users/hooksvue/Desktop/web-complex/xiaohongshu`，`language=node`，`installCmd` 留空，`startCmd` 为 `node scripts/server.mjs`。`www/` 必须在发布前生成：发布时会排除 `dist/`，`server.mjs` 优先托管 `www/`。
+
+发布完成后，首页脚本名应为 `index-BJYUPOmq.js`，再用下面的地址看视频：
+
+`https://xhs-explore.app.workbuddy.host/?view=mobile#/explore/6a8a4d4a0000000016022bb2`
 - **💻 本地开发预览**：`npm run dev` → 终端打印 `http://localhost:5173/`。
 - **💻 本地生产预览**：`npm run build && npm run start` → `http://localhost:5173/`。
 
@@ -172,7 +235,7 @@ xiaohongshu/
 ## 已知限制（待处理）
 
 - **直播签名按 URL 现算**：`x-s` / `x-s-common` / `x-t` 不在 `/api/sec/v1/scripting` 或 `/api/p/pj` 的响应里。一组签名只对当时那条 squarefeed 地址有效，换分类会得到 406，列表为空。Cookie 放在已忽略的 `.xhs-cookie`，签名放在已忽略的 `.xhs-live-sign.json`。
-- **GitHub Pages 没有直播数据**：Pages 是纯静态包，没有 `/api/xhs`。直播和实时抓取要看 Node 服务 [https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)。
+- **GitHub Pages 播不了视频**：Pages 没有 `/api/xhs/note`，`videoUrl` 为空，只剩封面。要看视频用本地 `5188`，或按上面「怎么看到视频」重新发布 Node 服务。
 - **评论数不展示**：匿名 feed 的 `interactInfo` 只有 `liked` / `likedCount`，没有评论数字段（需登录态接口），按需求暂不显示。
 - **点赞 / 分享已移除**：按需求，卡片与详情页都不展示点赞数、不提供分享入口，详情页仅保留「收藏」。
 - **风控间歇性 302**：匿名访问偶发被拦，已用「重试 + 内存/磁盘缓存」兜底，不会白屏；彻底解决需配登录 Cookie。
