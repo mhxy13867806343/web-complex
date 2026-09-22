@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Play } from '@nutui/icons-react'
+import { Heart, Play } from '@nutui/icons-react'
 import type { Note } from '../data'
 
 interface Props {
@@ -8,11 +8,11 @@ interface Props {
 }
 
 /**
- * 笔记卡片：只保留封面 + 标题。
- * 底部的作者 / 点赞数那一行已按要求整体移除（不做点击、不展示计数）。
+ * 笔记卡片：封面 + 标题 + 作者信息与点赞数展示（"likes": "787"）
  */
 export default function NoteCard({ note, onOpen }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
+  const [avatarBroken, setAvatarBroken] = useState(false)
 
   return (
     <div className="note-card" onClick={() => onOpen(note)}>
@@ -45,6 +45,26 @@ export default function NoteCard({ note, onOpen }: Props) {
 
       <div className="note-body">
         <div className="note-title ellipsis-2">{note.title}</div>
+        <div className="note-footer">
+          <div className="note-author">
+            {avatarBroken || !note.author.avatar ? (
+              <span className="note-avatar-fallback">{note.author.name.slice(0, 1)}</span>
+            ) : (
+              <img
+                className="note-avatar"
+                src={note.author.avatar}
+                alt=""
+                referrerPolicy="no-referrer"
+                onError={() => setAvatarBroken(true)}
+              />
+            )}
+            <span className="note-author-name">{note.author.name}</span>
+          </div>
+          <div className="note-likes">
+            <Heart width={12} height={12} />
+            <span className="note-likes-count">{note.likes || '0'}</span>
+          </div>
+        </div>
       </div>
     </div>
   )

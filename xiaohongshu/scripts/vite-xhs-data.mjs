@@ -172,6 +172,65 @@ async function fetchFeed(channel, fresh = false) {
   return { ...data, cached: false }
 }
 
+/** 抓取单篇笔记详情（多图列表、视频播放源、正文描述、话题标签、点赞数等） */
+async function fetchNoteDetail(id, noteUrl) {
+  const diskKey = 'note_detail_' + id
+  const disk = await readDisk(diskKey)
+  if (disk) return disk
+
+  const cookie = await getCookie()
+  const targetUrl = noteUrl || `https://www.xiaohongshu.com/explore/${id}`
+  const r = await probeRetry(targetUrl, cookie, 2)
+  if (r && r.state && r.state.note) {
+    const map = r.state.note.noteDetailMap || {}
+    const raw = map[id]?.note || Object.values(map)[0]?.note
+    if (raw) {
+      const imageList = (raw.imageList || [])
+        .map((img) => {
+          const dft = img.infoList?.find((i) => i.imageScene === 'WB_DFT') || img.infoList?.[0]
+          const url = (dft && dft.url) || img.urlDefault || img.urlPre || img.url || ''
+          return url.replace(/^http:/, 'https:')
+        })
+        .filter(Boolean)
+
+      const stream = raw.video?.media?.stream?.h264?.[0]
+      const videoUrl = (stream?.masterUrl || stream?.backupUrls?.[0] || '').replace(/^http:/, 'https:')
+
+      const res = {
+        id,
+        title: raw.title || '',
+        desc: raw.desc || '',
+        type: raw.type === 'video' || !!videoUrl ? 'video' : 'normal',
+        imageList,
+        videoUrl,
+        tags: (raw.tagList || []).map((t) => t.name).filter(Boolean),
+        time: raw.time || raw.lastUpdateTime || null,
+        interactInfo: {
+          likedCount: String(raw.interactInfo?.likedCount || '0'),
+          collectedCount: String(raw.interactInfo?.collectedCount || '0'),
+          commentCount: String(raw.interactInfo?.commentCount || '0'),
+          shareCount: String(raw.interactInfo?.shareCount || '0'),
+        },
+        user: {
+          name: raw.user?.nickname || raw.user?.nickName || '',
+          avatar: (raw.user?.avatar || '').replace(/^http:/, 'https:'),
+        },
+      }
+      void writeDisk(diskKey, res)
+      return res
+    }
+  }
+
+  return {
+    id,
+    desc: '',
+    imageList: [],
+    videoUrl: '',
+    tags: [],
+    interactInfo: null,
+  }
+}
+
 /**
  * 返回 connect 风格的请求处理器 (req, res) => void。
  * 约定：req.url 已经被去掉了 `/api/xhs` 前缀，即形如 `/feed?channel=推荐`。
@@ -199,6 +258,13 @@ export function buildXhsHandler() {
           fetchedAt: new Date().toISOString(),
           channels: list.map((c) => ({ name: c.name, id: c.id })),
         })
+      }
+      if (u.pathname === '/note') {
+        const id = u.searchParams.get('id')
+        const noteUrl = u.searchParams.get('url')
+        if (!id) return send(res, 400, { error: 'id is required' })
+        const data = await fetchNoteDetail(id, noteUrl)
+        return send(res, 200, data)
       }
       return send(res, 404, { error: 'not found' })
     } catch (e) {

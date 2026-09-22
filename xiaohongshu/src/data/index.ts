@@ -21,6 +21,32 @@ export interface Note {
   }
   /** 原站笔记链接（含 xsec_token） */
   noteUrl: string
+  /** 详情扩展字段（可选） */
+  desc?: string
+  imageList?: string[]
+  videoUrl?: string
+  tags?: string[]
+}
+
+export interface NoteDetailData {
+  id: string
+  title?: string
+  desc?: string
+  type?: 'normal' | 'video'
+  imageList?: string[]
+  videoUrl?: string
+  tags?: string[]
+  time?: number | string | null
+  interactInfo?: {
+    likedCount?: string
+    collectedCount?: string
+    commentCount?: string
+    shareCount?: string
+  } | null
+  user?: {
+    name?: string
+    avatar?: string
+  }
 }
 
 /** 每次「上拉加载」追加的条数 */

@@ -167,3 +167,43 @@ export async function fetchFeed(
   }
   return { ...getStaticFeed(ch, page, 10), page }
 }
+
+/** 抓取笔记完整详情（多图列表、视频播放直链、正文描述、话题标签、点赞数等） */
+export async function fetchNoteDetail(
+  id: string,
+  noteUrl?: string,
+  signal?: AbortSignal
+): Promise<import('./index').NoteDetailData> {
+  if (isStaticEnvironment()) {
+    return {
+      id,
+      imageList: [],
+      videoUrl: '',
+      desc: '',
+      tags: [],
+    }
+  }
+
+  const base = getApiBase()
+  const qs = new URLSearchParams({ id })
+  if (noteUrl) qs.set('url', noteUrl)
+  const path = `/api/xhs/note?${qs.toString()}`
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as import('./index').NoteDetailData
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e
+  }
+
+  return {
+    id,
+    imageList: [],
+    videoUrl: '',
+    desc: '',
+    tags: [],
+  }
+}
