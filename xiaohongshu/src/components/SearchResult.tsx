@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Home, Loading } from '@nutui/icons-react'
-import { BackTop, InfiniteLoading } from '@nutui/nutui-react'
+import { BackTop } from '@nutui/nutui-react'
 import type { Note } from '../data'
 import { fetchSearchResultsApi, type SearchResultData } from '../data/api'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
@@ -226,18 +226,6 @@ export default function SearchResult({
       setLoadingMore(false)
     }
   }, [currentKeyword, sort, noteType, activeSubTag, timeRange, searchScope, distance])
-
-  const onLoadMoreNutUI = useCallback(() => {
-    return new Promise<void>((resolve) => {
-      if (loadingRef.current || loadingMoreRef.current || !hasMoreRef.current) {
-        resolve()
-        return
-      }
-      void handleLoadMore().then(() => {
-        resolve()
-      })
-    })
-  }, [handleLoadMore])
 
   // 滚动触底检测双保险（同时监听容器和 window 滚动）
   useEffect(() => {
@@ -701,16 +689,7 @@ export default function SearchResult({
           </>
         )}
       </div>
-
-      <InfiniteLoading
-        hasMore={hasMore}
-        threshold={180}
-        target={SCROLLER_ID}
-        loadingText="正在加载更多…"
-        loadMoreText="— 我是有底线的 —"
-        onLoadMore={onLoadMoreNutUI}
-      />
-
+ 
       <BackTop
         target={SCROLLER_ID}
         threshold={240}
