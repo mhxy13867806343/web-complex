@@ -207,8 +207,13 @@ async function fetchFeed(channel, fresh = false, pagination = null) {
   const staticNotes = await loadStaticFallbackFeed(channel)
   const mergedMap = new Map()
   for (const n of rawNotes) mergedMap.set(n.id, n)
-  for (const n of staticNotes) if (!mergedMap.has(n.id)) mergedMap.set(n.id, n)
-  const allNotes = Array.from(mergedMap.values())
+  let allNotes = Array.from(mergedMap.values())
+  if (allNotes.length === 0) {
+    const recFallback = (await readDisk('feed:推荐'))?.notes || (await loadStaticFallbackFeed('推荐')) || []
+    if (recFallback.length) {
+      allNotes = recFallback
+    }
+  }
 
   const data = {
     channel,

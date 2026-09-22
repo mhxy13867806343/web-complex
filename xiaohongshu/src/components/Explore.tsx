@@ -148,8 +148,21 @@ export default function Explore() {
   // 监听浏览器前进 / 后退 / hash 改变，自动同步切换频道
   useEffect(() => {
     const handleUrlChange = () => {
+      // 如果当前处于博主主页等非探索页路由，绝对不触碰或重置探索页的频道状态
+      if (window.location.pathname.startsWith('/user')) {
+        return
+      }
       const ch = getInitialChannel()
-      setChannel((prev) => (prev !== ch ? ch : prev))
+      setChannel((prev) => {
+        if (prev === ch) {
+          // 若从直接在地址栏打开的个人页返回探索页且尚未加载过数据，补一次初次加载
+          if (!feedsRef.current[ch]?.length) {
+            void load(ch, true, 'refresh')
+          }
+          return prev
+        }
+        return ch
+      })
     }
     window.addEventListener('popstate', handleUrlChange)
     window.addEventListener('hashchange', handleUrlChange)
@@ -157,7 +170,7 @@ export default function Explore() {
       window.removeEventListener('popstate', handleUrlChange)
       window.removeEventListener('hashchange', handleUrlChange)
     }
-  }, [])
+  }, [load])
 
   // 分类实时拉取
   useEffect(() => {
@@ -173,8 +186,14 @@ export default function Explore() {
     return () => ac.abort()
   }, [])
 
-  // 首屏 + 每次切频道发起 Ajax 请求
+  // 首屏 + 每次切频道发起 Ajax 请求（已有缓存数据时直接复用，杜绝返回或切回频道时重复发请求）
   useEffect(() => {
+    if (window.location.pathname.startsWith('/user')) {
+      return
+    }
+    if (feedsRef.current[channel]?.length) {
+      return
+    }
     document.querySelector(SCROLLER)?.scrollTo({ top: 0 })
     void load(channel, true, 'refresh')
   }, [channel, load])

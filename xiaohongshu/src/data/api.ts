@@ -157,7 +157,9 @@ export async function fetchFeed(
     const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
     if (res.ok) {
       const data = (await res.json()) as FeedResult
-      return { ...data, notes: enrichNotes(data.notes), page }
+      if (data.notes && data.notes.length > 0) {
+        return { ...data, notes: enrichNotes(data.notes), page }
+      }
     }
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') throw err

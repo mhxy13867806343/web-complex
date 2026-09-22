@@ -15,26 +15,31 @@ export default function App() {
     <div className="phone">
       {/* 注意：这个 id 是必需的 —— NutUI 的 InfiniteLoading 用 document.getElementById(target) 找滚动容器，
           传类名选择器（'.page-body'）会找不到，它会静默回退到 window，导致上拉加载永远不触发。 */}
-      <div className="page-body" id="page-body">
-        {route.name === 'user' ? (
-          <UserPage
-            key={route.userId}
-            userId={route.userId || ''}
-            onBack={() => {
-              if (window.history.length > 1) {
-                window.history.back()
-              } else {
-                navigate('/')
-              }
-            }}
-            onOpenNote={(note) => {
-              navigate(`/?channel=推荐&note=${note.id}`)
-            }}
-          />
-        ) : (
-          <Explore />
-        )}
+      {/* 发现页保持常驻挂载：避免查看博主主页返回后数据重置、二次加载或空状态闪烁 */}
+      <div
+        className="page-body"
+        id="page-body"
+        style={{ display: route.name === 'user' ? 'none' : 'block' }}
+      >
+        <Explore />
       </div>
+
+      {route.name === 'user' && (
+        <UserPage
+          key={route.userId}
+          userId={route.userId || ''}
+          onBack={() => {
+            if (window.history.length > 1) {
+              window.history.back()
+            } else {
+              navigate('/')
+            }
+          }}
+          onOpenNote={(note) => {
+            navigate(`/?channel=推荐&note=${note.id}`)
+          }}
+        />
+      )}
       <ToastHost />
     </div>
   )
