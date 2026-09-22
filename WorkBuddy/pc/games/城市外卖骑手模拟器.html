@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>城市外卖骑手模拟器 · WorkBuddy PC</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  .main { display:flex; flex-direction:column; align-items:center; gap:12px;
+    max-width:1040px; margin:0 auto; padding:16px 14px 36px; }
+  .hud { width:100%; max-width:980px; display:flex; gap:8px; flex-wrap:wrap; align-items:stretch; }
+  .hud .s { flex:1 1 90px; background:var(--bg-1); border:1px solid var(--line); border-radius:10px;
+    padding:7px 10px; text-align:center; }
+  .hud .s b { display:block; font-size:17px; font-variant-numeric:tabular-nums; }
+  .hud .s span { font-size:10.5px; color:var(--txt-1); }
+  .fuelwrap { flex:2 1 160px; }
+  .fuelbar { height:8px; margin-top:5px; background:var(--bg-2); border-radius:99px; overflow:hidden; }
+  .fuelbar i { display:block; height:100%; width:100%; border-radius:99px;
+    background:linear-gradient(90deg,#34d399,#22d3ee); transition:width .2s; }
+  .stage { position:relative; width:100%; max-width:980px; }
+  canvas { width:100%; display:block; border-radius:14px; background:#0e1424; touch-action:none; }
+  .orderbar { width:100%; max-width:980px; display:flex; gap:8px; align-items:center; justify-content:space-between;
+    background:var(--bg-1); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:13px; }
+  .orderbar .who { color:var(--txt-1); }
+  .orderbar .t { font-variant-numeric:tabular-nums; font-weight:700; }
+  .overlay { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:rgba(8,12,22,.86); border-radius:14px; backdrop-filter:blur(4px); text-align:center; padding:20px; }
+  .overlay.show { display:flex; }
+  .overlay h2 { margin:0; font-size:30px; }
+  .overlay p { margin:0; color:var(--txt-1); font-size:14px; line-height:1.8; max-width:520px; }
+  .bikes { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .bike { width:170px; padding:12px; background:var(--bg-2); border:1px solid var(--line); border-radius:12px; cursor:pointer; }
+  .bike.sel { border-color:var(--acc); }
+  .bike.locked { opacity:.6; }
+  .bike h4 { margin:0 0 6px; font-size:14px; }
+  .bike .pr { font-size:12px; color:var(--warn); }
+  .bike .st { font-size:11px; color:var(--txt-1); line-height:1.6; margin-top:6px; }
+  kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
+    padding:1px 6px; font-size:12px; font-family:inherit; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="btn sm ghost" href="../index.html">← 返回</a>
+  <span class="title">城市外卖骑手模拟器</span>
+  <span class="spacer"></span>
+  <button class="btn sm ghost" id="btnGarage">🏍️ 车库</button>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+</div>
+
+<div class="main">
+  <div class="hud">
+    <div class="s"><b id="money">¥0</b><span>收入</span></div>
+    <div class="s"><b id="done">0</b><span>已送达</span></div>
+    <div class="s"><b id="bike">小电驴</b><span>座驾</span></div>
+    <div class="s fuelwrap"><span>油量</span><div class="fuelbar"><i id="fuel"></i></div></div>
+  </div>
+
+  <div class="orderbar">
+    <span class="who" id="orderText">点击「开始接单」上路</span>
+    <span class="t" id="orderTimer"></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="overlay show" id="menu">
+      <h2>🛵 城市外卖骑手</h2>
+      <p>在繁忙的城市里当一回外卖骑手：到 <b style="color:#34d399">绿圈</b> 取餐，再送到 <b style="color:#f87171">红圈</b> 顾客手上，
+        跟着箭头走、躲开路上的汽车、留意油量（到 <b style="color:#fbbf24">黄色加油站</b> 补油）。<br><br>
+        <kbd>W</kbd>/<kbd>↑</kbd> 加速 · <kbd>S</kbd>/<kbd>↓</kbd> 倒车 · <kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> 转向 · <kbd>空格</kbd> 刹车<br>
+        限时送达有额外小费，赚钱去车库换更快的摩托！</p>
+      <button class="btn primary" id="btnStart">开始接单</button>
+    </div>
+    <div class="overlay" id="garage">
+      <h2>🏍️ 车库</h2>
+      <p id="garageMoney">当前收入 ¥0</p>
+      <div class="bikes" id="bikeList"></div>
+      <button class="btn ghost" id="btnCloseGarage">返回上路</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  // ---------- 城市地图 ----------
+  var BLOCKS = 6, BS = 230, RW = 96;
+  var SPAN = BS + RW;                 // 一个「路+街区」单元
+  var CITY = BLOCKS * SPAN + RW;      // 城市总边长
+
+  function onRoad(x, y) {
+    if (x < 0 || y < 0 || x > CITY || y > CITY) return false;
+    return (x % SPAN) < RW || (y % SPAN) < RW;
+  }
+
+  // ---------- 摩托（座驾） ----------
+  var BIKES = [
+    { name: '小电驴', max: 250, acc: 300, turn: 3.1, tank: 100, price: 0,   col: '#22d3ee' },
+    { name: '街跑',   max: 330, acc: 380, turn: 3.5, tank: 110, price: 260, col: '#4f8cff' },
+    { name: '重机',   max: 420, acc: 470, turn: 3.9, tank: 120, price: 720, col: '#f59e0b' }
+  ];
+
+  // ---------- 状态 ----------
+  var player, order, traffic, stations, cam, keys;
+  var money, delivered, fuel, running, paused, curBike, owned, engineOn;
+
+  money = 0; delivered = 0; running = false; paused = false; curBike = 0;
+  owned = [true, false, false];
+  keys = {};
+
+  function reset(full) {
+    player = { x: RW / 2 + SPAN, y: RW / 2, angle: 0, speed: 0, spin: 0 };
+    cam = { x: 0, y: 0 };
+    fuel = BIKES[curBike].tank;
+    traffic = []; stations = [];
+    for (var i = 0; i < 3; i++) stations.push(randRoadPoint());
+    spawnTraffic(full ? 7 : 7);
+    order = null;
+    el('orderText').textContent = '跟着箭头去取餐 / 送餐';
+    el('orderTimer').textContent = '';
+    updateHUD();
+  }
+
+  function randRoadPoint() {
+    // 在道路上随机取一点（优先路口附近，好停好认）
+    for (var k = 0; k < 60; k++) {
+      var x = Math.random() * CITY, y = Math.random() * CITY;
+      if (onRoad(x, y)) return { x: x, y: y };
+    }
+    return { x: RW / 2, y: RW / 2 };
+  }
+
+  // ---------- 订单 ----------
+  function newOrder() {
+    var p = randRoadPoint(), d = randRoadPoint();
+    var guard = 0;
+    while (dist(p, d) < CITY * 0.3 && guard++ < 40) d = randRoadPoint();
+    var base = 46 + delivered * 2;                 // 时限逐单略降
+    var limit = Math.max(30, base - Math.min(18, delivered));
+    order = { stage: 'pickup', pick: p, drop: d, t: limit, tmax: limit, pay: 40 + Math.round(dist(p, d) / 22) };
+    el('orderText').innerHTML = '前往 <b style="color:#34d399">绿圈</b> 取餐';
+    WB.sfx.play('start');
+  }
+
+  function dist(a, b) { var dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy); }
+
+  // ---------- 车流 ----------
+  function spawnTraffic(n) {
+    for (var i = 0; i < n; i++) {
+      var horiz = Math.random() < 0.5;
+      var line = Math.floor(Math.random() * (BLOCKS + 1));
+      traffic.push({
+        horiz: horiz, line: line,
+        pos: Math.random() * CITY,
+        dir: Math.random() < 0.5 ? 1 : -1,
+        speed: 90 + Math.random() * 90,
+        col: ['#f87171', '#fbbf24', '#93c5fd', '#e879f9', '#34d399'][Math.floor(Math.random() * 5)]
+      });
+    }
+  }
+  function carXY(c) {
+    var off = RW / 2;
+    if (c.horiz) return { x: c.pos, y: c.line * SPAN + off, ang: c.dir > 0 ? 0 : Math.PI };
+    return { x: c.line * SPAN + off, y: c.pos, ang: c.dir > 0 ? Math.PI / 2 : -Math.PI / 2 };
+  }
+
+  // ---------- 输入 ----------
+  window.addEventListener('keydown', function (e) {
+    keys[e.key.toLowerCase()] = true;
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].indexOf(e.key.toLowerCase()) >= 0) e.preventDefault();
+    if (e.key === ' ') e.preventDefault();
+    WB.sfx.unlock();
+  });
+  window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+
+  // ---------- 引擎音（随速度变调） ----------
+  var actx = null, eng = null, engGain = null;
+  function engineStart() {
+    if (actx) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      actx = new AC(); eng = actx.createOscillator(); engGain = actx.createGain();
+      eng.type = 'sawtooth'; eng.frequency.value = 50; engGain.gain.value = 0.0;
+      eng.connect(engGain); engGain.connect(actx.destination); eng.start();
+    } catch (e) { actx = null; eng = null; engGain = null; }
+  }
+  function engineUpdate() {
+    if (!eng) return;
+    var on = running && !paused && WB.sfx.isEnabled();
+    var sp = Math.abs(player.speed);
+    eng.frequency.value = 46 + (sp / BIKES[curBike].max) * 130;
+    engGain.gain.value += ((on ? 0.05 + (sp / BIKES[curBike].max) * 0.05 : 0) - engGain.gain.value) * 0.2;
+  }
+
+  // ---------- 主循环 ----------
+  var last = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    var dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
+    if (running && !paused) { update(dt); }
+    engineUpdate();
+    render();
+  }
+
+  function update(dt) {
+    var bike = BIKES[curBike];
+    // 油门 / 倒车 / 刹车
+    var fwd = keys['w'] || keys['arrowup'], back = keys['s'] || keys['arrowdown'], brake = keys[' '];
+    var stalled = fuel <= 0;
+    if (fwd && !stalled) player.speed += bike.acc * dt;
+    else if (back) player.speed -= bike.acc * 0.7 * dt;
+    if (brake) player.speed -= Math.sign(player.speed) * bike.acc * 1.8 * dt;
+    // 阻力 + 限速
+    player.speed -= player.speed * 1.4 * dt;
+    var cap = stalled ? 40 : bike.max;
+    player.speed = Math.max(-bike.max * 0.4, Math.min(cap, player.speed));
+    if (Math.abs(player.speed) < 2 && !fwd && !back) player.speed = 0;
+
+    // 转向（速度越快转得越灵，倒车反向）
+    var steer = (keys['a'] || keys['arrowleft'] ? -1 : 0) + (keys['d'] || keys['arrowright'] ? 1 : 0);
+    if (steer) player.angle += steer * bike.turn * dt * Math.min(1, Math.abs(player.speed) / 90) * (player.speed < 0 ? -1 : 1);
+
+    // 位移 + 撞墙（不能开进街区）
+    var nx = player.x + Math.cos(player.angle) * player.speed * dt;
+    var ny = player.y + Math.sin(player.angle) * player.speed * dt;
+    if (onRoad(nx, ny)) { player.x = nx; player.y = ny; }
+    else if (onRoad(nx, player.y)) { player.x = nx; player.speed *= 0.7; }
+    else if (onRoad(player.x, ny)) { player.y = ny; player.speed *= 0.7; }
+    else { player.speed *= -0.25; WB.sfx.play('error'); }
+
+    // 油耗
+    if (!stalled) fuel -= (0.5 + Math.abs(player.speed) / bike.max * 1.6) * dt;
+    if (fuel < 0) fuel = 0;
+
+    // 加油站补油
+    for (var s = 0; s < stations.length; s++) {
+      if (Math.abs(player.speed) < 60 && dist(player, stations[s]) < RW * 0.7) {
+        if (fuel < bike.tank) { fuel = Math.min(bike.tank, fuel + 26 * dt); if ((fuel | 0) % 6 === 0) WB.sfx.play('tick'); }
+      }
+    }
+
+    // 撞车判定
+    if (player.spin > 0) player.spin -= dt;
+    else {
+      for (var t = 0; t < traffic.length; t++) {
+        var cp = carXY(traffic[t]);
+        if (dist(player, cp) < RW * 0.55) {
+          player.spin = 1.1; player.speed *= -0.4;
+          if (order) order.t = Math.max(0, order.t - 4);   // 撞车扣时间
+          WB.sfx.play('drop');
+          break;
+        }
+      }
+    }
+
+    // 订单推进
+    if (order) {
+      order.t -= dt;
+      var target = order.stage === 'pickup' ? order.pick : order.drop;
+      if (dist(player, target) < RW * 0.7 && Math.abs(player.speed) < 90) {
+        if (order.stage === 'pickup') {
+          order.stage = 'drop'; WB.sfx.play('pop');
+          el('orderText').innerHTML = '已取餐！送往 <b style="color:#f87171">红圈</b> 顾客';
+        } else {
+          var bonus = Math.round((order.t / order.tmax) * 30);
+          var gain = order.pay + bonus;
+          money += gain; delivered++;
+          WB.sfx.play('win');
+          el('orderText').innerHTML = '送达！<b style="color:#34d399">+¥' + gain + '</b>（小费 ¥' + bonus + '）';
+          newOrder();
+        }
+      } else if (order.t <= 0) {
+        WB.sfx.play('lose');
+        el('orderText').innerHTML = '<b style="color:#f87171">超时，订单被取消…</b> 接下一单吧';
+        newOrder();
+      }
+    }
+
+    // 车流移动
+    for (var k = 0; k < traffic.length; k++) {
+      var c = traffic[k];
+      c.pos += c.dir * c.speed * dt;
+      if (c.pos < -40) c.pos = CITY + 40; if (c.pos > CITY + 40) c.pos = -40;
+      // 路口随机变道
+      var cellC = c.pos / SPAN;
+      if (Math.abs(cellC - Math.round(cellC)) < 0.02 && Math.random() < 0.01) {
+        c.horiz = !c.horiz; c.line = Math.max(0, Math.min(BLOCKS, Math.round(cellC)));
+      }
+    }
+
+    // 相机跟随
+    cam.x += (player.x - cam.x) * Math.min(1, dt * 5);
+    cam.y += (player.y - cam.y) * Math.min(1, dt * 5);
+    if (CITY > VW) cam.x = Math.max(VW / 2, Math.min(CITY - VW / 2, cam.x));   // 相机不出城市边界
+    if (CITY > VH) cam.y = Math.max(VH / 2, Math.min(CITY - VH / 2, cam.y));
+
+    updateHUD();
+  }
+
+  // ---------- 渲染 ----------
+  var VW = 0, VH = 0;
+  function resize() {
+    var w = Math.min(cv.parentNode.clientWidth, 980);
+    VW = w; VH = Math.round(w * 0.6);
+    cv.width = VW * DPR; cv.height = VH * DPR;
+    cv.style.height = VH + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, VW, VH);
+    if (!player) return;
+    var ox = VW / 2 - cam.x, oy = VH / 2 - cam.y;
+    ctx.save(); ctx.translate(ox, oy);
+
+    // 街区
+    ctx.fillStyle = '#141b30';
+    for (var i = 0; i < BLOCKS; i++) for (var j = 0; j < BLOCKS; j++) {
+      var bx = i * SPAN + RW, by = j * SPAN + RW;
+      ctx.fillRect(bx, by, BS, BS);
+      ctx.fillStyle = (i + j) % 2 ? '#161e35' : '#141b30';
+    }
+    // 道路
+    ctx.fillStyle = '#232c44';
+    for (var r = 0; r <= BLOCKS; r++) {
+      ctx.fillRect(r * SPAN, 0, RW, CITY);        // 纵向路
+      ctx.fillRect(0, r * SPAN, CITY, RW);        // 横向路
+    }
+    // 车道虚线
+    ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 2; ctx.setLineDash([16, 18]);
+    for (var r2 = 0; r2 <= BLOCKS; r2++) {
+      ctx.beginPath(); ctx.moveTo(r2 * SPAN + RW / 2, 0); ctx.lineTo(r2 * SPAN + RW / 2, CITY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, r2 * SPAN + RW / 2); ctx.lineTo(CITY, r2 * SPAN + RW / 2); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // 加油站
+    for (var s = 0; s < stations.length; s++) marker(stations[s], '#fbbf24', '⛽');
+    // 订单目标
+    if (order) {
+      var tg = order.stage === 'pickup' ? order.pick : order.drop;
+      marker(order.pick, '#34d399', '🍜');
+      if (order.stage === 'drop') marker(order.drop, '#f87171', '🏠');
+      // 指引箭头
+      var ang = Math.atan2(tg.y - player.y, tg.x - player.x);
+      ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(ang);
+      ctx.fillStyle = order.stage === 'pickup' ? 'rgba(52,211,153,.9)' : 'rgba(248,113,113,.9)';
+      ctx.beginPath(); ctx.moveTo(46, 0); ctx.lineTo(28, -9); ctx.lineTo(28, 9); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    // 车流
+    for (var t = 0; t < traffic.length; t++) {
+      var cp = carXY(traffic[t]);
+      ctx.save(); ctx.translate(cp.x, cp.y); ctx.rotate(cp.ang);
+      ctx.fillStyle = traffic[t].col;
+      rr(-22, -11, 44, 22, 6); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(2, -8, 12, 16, 3); ctx.fill();
+      ctx.restore();
+    }
+
+    // 玩家摩托
+    ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle + (player.spin > 0 ? player.spin * 12 : 0));
+    var bc = BIKES[curBike].col;
+    if (player.spin > 0 && Math.floor(player.spin * 12) % 2) ctx.globalAlpha = 0.4;
+    ctx.fillStyle = bc; rr(-20, -8, 40, 16, 8); ctx.fill();
+    ctx.fillStyle = '#0b0f1a'; ctx.beginPath(); ctx.arc(14, 0, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#eaf0ff'; rr(-6, -5, 12, 10, 3); ctx.fill();   // 骑手
+    ctx.globalAlpha = 1; ctx.restore();
+
+    ctx.restore();
+  }
+
+  function marker(p, col, emoji) {
+    ctx.save(); ctx.translate(p.x, p.y);
+    var pulse = 1 + Math.sin(performance.now() / 240) * 0.12;
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.arc(0, 0, RW * 0.42 * pulse, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 0, 1);
+    ctx.restore();
+  }
+
+  function rr(x, y, w, h, r) {
+    if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- HUD / 车库 ----------
+  function el(id) { return document.getElementById(id); }
+  function updateHUD() {
+    el('money').textContent = '¥' + money;
+    el('done').textContent = delivered;
+    el('bike').textContent = BIKES[curBike].name;
+    el('fuel').style.width = Math.round(fuel / BIKES[curBike].tank * 100) + '%';
+    el('fuel').style.background = fuel / BIKES[curBike].tank < 0.25 ? 'linear-gradient(90deg,#f87171,#fbbf24)' : 'linear-gradient(90deg,#34d399,#22d3ee)';
+    if (order) el('orderTimer').textContent = '⏱ ' + Math.ceil(order.t) + 's';
+  }
+
+  function openGarage() {
+    paused = true;
+    el('garageMoney').textContent = '当前收入 ¥' + money;
+    var list = el('bikeList'); list.innerHTML = '';
+    BIKES.forEach(function (b, i) {
+      var d = document.createElement('div');
+      d.className = 'bike' + (i === curBike ? ' sel' : '') + (owned[i] ? '' : ' locked');
+      d.innerHTML = '<h4>' + b.name + '</h4><div class="pr">' + (owned[i] ? (i === curBike ? '使用中' : '已拥有') : '¥' + b.price) + '</div>' +
+        '<div class="st">极速 ' + b.max + ' · 加速 ' + b.acc + '<br>转向 ' + b.turn + ' · 油箱 ' + b.tank + '</div>';
+      d.onclick = function () {
+        if (owned[i]) { curBike = i; fuel = Math.min(fuel, BIKES[i].tank); WB.sfx.play('click'); openGarage(); }
+        else if (money >= b.price) { money -= b.price; owned[i] = true; curBike = i; fuel = BIKES[i].tank; WB.sfx.play('win'); openGarage(); }
+        else WB.sfx.play('error');
+        updateHUD();
+      };
+      list.appendChild(d);
+    });
+    el('garage').classList.add('show');
+  }
+
+  el('btnStart').onclick = function () {
+    el('menu').classList.remove('show');
+    engineStart(); running = true; reset(true); newOrder();
+  };
+  el('btnGarage').onclick = function () { if (running) { WB.sfx.play('click'); openGarage(); } };
+  el('btnCloseGarage').onclick = function () { el('garage').classList.remove('show'); paused = false; };
+  el('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
+  window.addEventListener('resize', resize);
+
+  resize();
+  player = { x: RW, y: RW / 2, angle: 0, speed: 0, spin: 0 };
+  reset(false);
+  requestAnimationFrame(loop);
+  // 测试钩子：带 #autostart 直接开局（无头验证用，正常访问无影响）
+  if (location.hash.indexOf('autostart') >= 0) el('btnStart').click();
+})();
+</script>
+</body>
+</html>
