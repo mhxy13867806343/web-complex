@@ -352,3 +352,56 @@ export function buildUserProfile(
   }
 }
 
+export interface SearchFilterOptions {
+  sort?: string // 'general' | 'latest' | 'most_likes' | 'most_comments' | 'most_collected'
+  noteType?: string // 'all' | 'video' | 'image'
+  subTag?: string
+  timeRange?: string
+  searchScope?: string
+  distance?: string
+}
+
+export interface SearchResultData {
+  keyword: string
+  subTags: string[]
+  activeSubTag: string
+  total: number
+  notes: Note[]
+}
+
+/**
+ * 抓取搜索结果列表（支持关键词搜索、排序模式与笔记类型过滤）
+ */
+export async function fetchSearchResultsApi(
+  keyword: string,
+  options: SearchFilterOptions = {},
+  signal?: AbortSignal
+): Promise<SearchResultData> {
+  const base = getApiBase()
+  const qs = new URLSearchParams()
+  qs.set('keyword', keyword)
+  if (options.sort) qs.set('sort', options.sort)
+  if (options.noteType) qs.set('note_type', options.noteType)
+  if (options.subTag) qs.set('sub_tag', options.subTag)
+
+  const path = `/api/xhs/search?${qs.toString()}`
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as SearchResultData
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e
+  }
+
+  return {
+    keyword,
+    subTags: ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略'],
+    activeSubTag: options.subTag || '综合',
+    total: 0,
+    notes: [],
+  }
+}
+

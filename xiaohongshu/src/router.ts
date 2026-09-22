@@ -3,11 +3,14 @@ import type { Author } from './data'
 
 export interface RouteInfo {
   path: string
-  name: 'home' | 'user' | 'note'
+  name: 'home' | 'user' | 'note' | 'search'
   userId?: string
   noteId?: string
   author?: Author
   channel?: string
+  keyword?: string
+  searchType?: string
+  source?: string
   query: Record<string, string>
 }
 
@@ -118,6 +121,25 @@ export function parseRoute(rawUrl?: string): RouteInfo {
       }
     }
 
+    // 匹配搜索结果页路由：/search_result/、/search_result 或 /search
+    const isSearchPath = pathname.startsWith('/search_result') || pathname.startsWith('/search')
+    const searchKeyword = searchParams.get('keyword') || searchParams.get('q')
+
+    if (isSearchPath || (searchKeyword && pathname.includes('search'))) {
+      const keyword = (searchKeyword ? decodeURIComponent(searchKeyword) : 'vlog').trim()
+      const searchType = searchParams.get('type') || '54'
+      const source = searchParams.get('source') || 'web_note_detail_r10'
+
+      return {
+        path: pathname,
+        name: 'search',
+        keyword,
+        searchType,
+        source,
+        query,
+      }
+    }
+
     const ch = query.channel || query.tab
     if (ch) {
       setExploreChannel(decodeURIComponent(ch).trim())
@@ -207,6 +229,17 @@ export function openUserProfileRoute(author: Partial<Author> & { name?: string; 
 export function openNoteRoute(target: string | { id: string }) {
   const noteId = typeof target === 'string' ? target : target.id
   navigate(`/explore/${noteId}`)
+}
+
+/**
+ * 跳转到搜索结果页独立路由（对齐小红书官方规范 /search_result/?keyword=...&type=54&source=web_note_detail_r10）
+ */
+export function openSearchResultRoute(keyword: string, options?: { type?: string; source?: string }) {
+  const cleanKeyword = keyword.replace(/^#/, '').trim()
+  const type = options?.type || '54'
+  const source = options?.source || 'web_note_detail_r10'
+  const url = `/search_result/?keyword=${encodeURIComponent(cleanKeyword)}&type=${type}&source=${source}`
+  navigate(url)
 }
 
 /**

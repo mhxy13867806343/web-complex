@@ -1,6 +1,7 @@
 import Explore from './components/Explore'
 import UserPage from './components/UserPage'
 import NoteDetail from './components/NoteDetail'
+import SearchResult from './components/SearchResult'
 import { ToastHost } from './components/Toast'
 import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl } from './router'
 
@@ -9,6 +10,7 @@ import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl 
  * 1. 发现页路由（/ 或 /?channel=...）渲染 Explore
  * 2. 用户主页路由（/user/profile/:userId 或 /user/:userId）渲染独立页面 UserPage
  * 3. 笔记详情路由（/explore/:noteId）渲染独立页面 NoteDetail
+ * 4. 搜索结果路由（/search_result/?keyword=...）渲染独立页面 SearchResult
  */
 export default function App() {
   const route = useRoute()
@@ -63,6 +65,29 @@ export default function App() {
           }}
           onGoHome={() => {
             navigate(getExploreUrl())
+          }}
+          onOpenUser={(author) => {
+            openUserProfileRoute(author)
+          }}
+        />
+      )}
+
+      {route.name === 'search' && (
+        <SearchResult
+          key={route.keyword}
+          keyword={route.keyword || 'vlog'}
+          onBack={() => {
+            if (window.history.length > 1) {
+              window.history.back()
+            } else {
+              navigate(getExploreUrl())
+            }
+          }}
+          onGoHome={() => {
+            navigate(getExploreUrl())
+          }}
+          onOpenNote={(note) => {
+            openNoteRoute(note.id)
           }}
           onOpenUser={(author) => {
             openUserProfileRoute(author)

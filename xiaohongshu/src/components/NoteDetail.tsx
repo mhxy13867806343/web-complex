@@ -10,7 +10,7 @@ import {
 } from '@nutui/icons-react'
 import type { CommentItem, Note, NoteDetailData, Author } from '../data'
 import { fetchNoteComments, fetchNoteDetail } from '../data/api'
-import { openUserProfileRoute, navigate, getExploreUrl } from '../router'
+import { openUserProfileRoute, openSearchResultRoute, navigate, getExploreUrl } from '../router'
 import { Toast } from './Toast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
@@ -448,7 +448,17 @@ export default function NoteDetail({
             {detail?.tags && detail.tags.length > 0 && (
               <div className="detail-tags-list">
                 {detail.tags.map((tag, i) => (
-                  <span key={i} className="detail-tag-item">
+                  <span
+                    key={i}
+                    className="detail-tag-item"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openSearchResultRoute(tag)
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={`点击搜索 #${tag}`}
+                  >
                     #{tag}
                   </span>
                 ))}

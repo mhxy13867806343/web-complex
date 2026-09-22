@@ -770,6 +770,190 @@ export async function fetchUserDetail(userId, name, avatar, token) {
 }
 
 /**
+ * 搜索笔记（对齐小红书官方搜索结果页 /search_result/?keyword=...）
+ */
+export async function searchNotesApi({ keyword = '', sort = 'general', noteType = 'all', subTag = '' }) {
+  const kw = keyword.replace(/^#/, '').trim().toLowerCase()
+  const isVlog = kw.includes('vlog')
+
+  // 二级热词/标签栏（图 2 原汁原味）
+  let subTags = ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略']
+  if (isVlog) {
+    subTags = ['综合', '西安', '日常生活', '杭州', '上学日记', '南京', '长沙', '治愈系', '新加坡', '打工人', '青岛', '马来西亚']
+  } else if (kw.includes('生活') || kw.includes('日常')) {
+    subTags = ['综合', '独居生活', '日常随拍', '周末去哪儿', '自律', '治愈系', '好物', '美食记录']
+  } else if (kw.includes('好物') || kw.includes('推荐')) {
+    subTags = ['综合', '数码家电', '居家好物', '护肤彩妆', '平价好物', '踩雷避坑', '学生党', '租房神器']
+  }
+
+  // 1. 图 2 对应的高保真 Vlog 精品卡片
+  const vlogSpecialNotes = [
+    {
+      id: 'vlog_hike_beigaofeng',
+      title: 'Vlog🌲 徒步北高峰！早起爬山是最好的转运',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/11934cf722a7c27fef250d26ed436de5/1000g0082onup4psk606g5om83em0g6c87aafun0!nc_n_nwebp_mw_1',
+      author: {
+        name: 'Enndme',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '6054fe950000000005774a42',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/6054fe950000000005774a42',
+      },
+      likes: 7572,
+      isVideo: true,
+      tags: ['vlog', '生活记录', '徒步', '爬山', '杭州', '日常分享'],
+      date: '06-23',
+    },
+    {
+      id: 'vlog_alone_living_afterwork',
+      title: '独居vlog | 下班回家才是真正生活的开始 📁',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/c075057b19cb3197be34f741bcf63e8d/1000g0082pbq9kvkjq0004a3p3ru0doovflf75r0!nc_n_nwebp_mw_1',
+      author: {
+        name: '一帧的日记录',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/54eefc3c0000000005600160.jpg',
+        userId: '54eefc3c0000000005600160',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/54eefc3c0000000005600160',
+      },
+      likes: 830,
+      isVideo: true,
+      tags: ['vlog', '独居', '下班日常', '生活记录', '日常生活'],
+      date: '04-13',
+    },
+    {
+      id: 'vlog_rent_four_hundred_day',
+      title: '日常vlog | 房租四百八真实生活的一天',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/5ad085e460a20984bfd5345790cd3269/1000g0082p3odmi8k60005nit8i4g8hu2grn2qrg!nc_n_nwebp_mw_1',
+      author: {
+        name: '钰钰年糕',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+        userId: '5d69dbca00000000010081fc',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5d69dbca00000000010081fc',
+      },
+      likes: 772,
+      isVideo: true,
+      tags: ['vlog', '租房生活', '生活记录', '日常分享', '治愈系'],
+      date: '08-02',
+    },
+    {
+      id: 'vlog_thirty_three_storage',
+      title: 'vlog 33岁独居 高能量 早起沉浸式收纳 ✨',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/5a3fb5d74554950daa866bfe441824c3/1000g0082p476ibuk40004a4nt9fru98od6ds8d0!nc_n_nwebp_mw_1',
+      author: {
+        name: '希米三十啦',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5a4d3f3a000000000b8c6995.jpg',
+        userId: '5a4d3f3a000000000b8c6995',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5a4d3f3a000000000b8c6995',
+      },
+      likes: 2107,
+      isVideo: true,
+      tags: ['vlog', '独居生活', '收纳', '自律', '生活记录'],
+      date: '08-13',
+    },
+    {
+      id: 'vlog_cafe_weekend_relax',
+      title: '独处日记 ☕️ 找一家街角咖啡馆发呆的下午',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/c075057b19cb3197be34f741bcf63e8d/1000g0082pbq9kvkjq0004a3p3ru0doovflf75r0!nc_n_nwebp_mw_1',
+      author: {
+        name: '夏天的风',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64159a23aab651ae65a49601.jpg',
+        userId: '64159a23aab651ae65a49601',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64159a23aab651ae65a49601',
+      },
+      likes: 4320,
+      isVideo: false,
+      tags: ['vlog', '生活记录', '咖啡馆', '治愈系'],
+      date: '07-29',
+    },
+    {
+      id: 'vlog_student_study_routine',
+      title: '大学生日记 | 考研人自律高效的一天学习vlog 📖',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/11934cf722a7c27fef250d26ed436de5/1000g0082onup4psk606g5om83em0g6c87aafun0!nc_n_nwebp_mw_1',
+      author: {
+        name: '晨曦Study',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/502436640000000004908972.jpg',
+        userId: '502436640000000004908972',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/502436640000000004908972',
+      },
+      likes: 5420,
+      isVideo: true,
+      tags: ['vlog', '上学日记', '自律', '生活记录', '南京'],
+      date: '09-10',
+    },
+  ]
+
+  // 2. 从全站所有磁盘缓存频道与静态池中搜寻
+  let pool = []
+  try {
+    const files = await fs.readdir(DISK_DIR)
+    for (const file of files) {
+      if (file.startsWith('feed%3A') && file.endsWith('.json')) {
+        const feedData = await readDisk(decodeURIComponent(file.replace(/\.json$/, '')))
+        if (feedData?.notes) pool.push(...feedData.notes)
+      }
+    }
+  } catch {}
+
+  if (!pool.length) {
+    const channels = ['推荐', '影视', '穿搭', '美食', '职场', '彩妆']
+    for (const ch of channels) {
+      const list = await loadStaticFallbackFeed(ch)
+      pool.push(...list)
+    }
+  }
+
+  let allNotes = isVlog ? [...vlogSpecialNotes] : []
+  const seen = new Set(allNotes.map((n) => n.id))
+
+  for (const n of pool) {
+    if (seen.has(n.id)) continue
+    const titleMatch = (n.title || '').toLowerCase().includes(kw)
+    const descMatch = (n.desc || '').toLowerCase().includes(kw)
+    const tagMatch = (n.tags || []).some((t) => t.toLowerCase().includes(kw))
+    const authorMatch = (n.author?.name || '').toLowerCase().includes(kw)
+    if (!kw || titleMatch || descMatch || tagMatch || authorMatch || isVlog) {
+      seen.add(n.id)
+      allNotes.push(n)
+    }
+  }
+
+  // 二级 subTag 联动筛选
+  if (subTag && subTag !== '综合') {
+    const stLower = subTag.toLowerCase()
+    const filtered = allNotes.filter((n) => {
+      const matchTag = (n.tags || []).some((t) => t.toLowerCase().includes(stLower))
+      const matchTitle = (n.title || '').toLowerCase().includes(stLower)
+      return matchTag || matchTitle
+    })
+    if (filtered.length > 0) {
+      allNotes = filtered
+    }
+  }
+
+  // 笔记类型筛选：video / image
+  if (noteType === 'video') {
+    allNotes = allNotes.filter((n) => Boolean(n.isVideo))
+  } else if (noteType === 'image') {
+    allNotes = allNotes.filter((n) => !n.isVideo)
+  }
+
+  // 排序筛选
+  if (sort === 'most_likes') {
+    allNotes.sort((a, b) => (b.likes || 0) - (a.likes || 0))
+  } else if (sort === 'latest') {
+    allNotes.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  } else if (sort === 'most_comments' || sort === 'most_collected') {
+    allNotes.sort((a, b) => ((b.likes || 0) * 0.4) - ((a.likes || 0) * 0.4))
+  }
+
+  return {
+    keyword,
+    subTags,
+    activeSubTag: subTag || '综合',
+    total: allNotes.length,
+    notes: allNotes.slice(0, 30),
+  }
+}
+
+/**
  * 返回 connect 风格的请求处理器 (req, res) => void。
  * 约定：req.url 已经被去掉了 `/api/xhs` 前缀，即形如 `/feed?channel=推荐`。
  */
@@ -839,6 +1023,14 @@ export function buildXhsHandler() {
         const commentCount = u.searchParams.get('comment_count') || ''
         const comments = await fetchComments(noteId, title, tags, commentCount)
         return send(res, 200, comments)
+      }
+      if (u.pathname === '/search') {
+        const keyword = u.searchParams.get('keyword') || ''
+        const sort = u.searchParams.get('sort') || 'general'
+        const noteType = u.searchParams.get('note_type') || 'all'
+        const subTag = u.searchParams.get('sub_tag') || ''
+        const data = await searchNotesApi({ keyword, sort, noteType, subTag })
+        return send(res, 200, data)
       }
       if (u.pathname === '/user') {
         const userId = u.searchParams.get('id') || ''
