@@ -15,7 +15,6 @@ interface Props {
 export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'notes' | 'collects'>('notes')
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
@@ -207,59 +206,35 @@ export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }
               </div>
             </div>
 
-            {/* 作品 Tabs */}
+            {/* 作品 Tab（仅展示笔记） */}
             <div className="user-tabs-bar">
-              <button
-                type="button"
-                className={`user-tab-item ${activeTab === 'notes' ? 'active' : ''}`}
-                onClick={() => setActiveTab('notes')}
-              >
+              <div className="user-tab-item active">
                 笔记 <span>{notes.length}</span>
-              </button>
-              <button
-                type="button"
-                className={`user-tab-item ${activeTab === 'collects' ? 'active' : ''}`}
-                onClick={() => setActiveTab('collects')}
-              >
-                收藏
-              </button>
+              </div>
             </div>
 
             {/* 笔记双列瀑布流 */}
-            {activeTab === 'notes' && (
-              <div className="user-notes-grid">
-                {notes.length === 0 ? (
-                  <div className="user-empty-state">
-                    <span>🍠</span>
-                    <p>暂无公开笔记</p>
+            <div className="user-notes-grid">
+              {notes.length === 0 ? (
+                <div className="user-empty-state">
+                  <span>🍠</span>
+                  <p>暂无公开笔记</p>
+                </div>
+              ) : (
+                <div className="waterfall">
+                  <div className="waterfall-col">
+                    {leftCol.map((note) => (
+                      <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
+                    ))}
                   </div>
-                ) : (
-                  <div className="waterfall">
-                    <div className="waterfall-col">
-                      {leftCol.map((note) => (
-                        <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
-                      ))}
-                    </div>
-                    <div className="waterfall-col">
-                      {rightCol.map((note) => (
-                        <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
-                      ))}
-                    </div>
+                  <div className="waterfall-col">
+                    {rightCol.map((note) => (
+                      <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* 收藏 Tab */}
-            {activeTab === 'collects' && (
-              <div className="user-empty-state">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-                <p>作者设置了收藏内容仅自己可见</p>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <div className="user-page-empty">
