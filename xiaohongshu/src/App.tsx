@@ -19,8 +19,7 @@ export default function App() {
         {route.name === 'user' ? (
           <UserPage
             key={route.userId}
-            userId={route.userId}
-            author={route.author}
+            userId={route.userId || ''}
             onBack={() => {
               if (window.history.length > 1) {
                 window.history.back()

@@ -80,32 +80,21 @@ export function parseRoute(rawUrl?: string): RouteInfo {
 
     if (userProfileMatch || userQueryId) {
       const rawUserId = userProfileMatch ? decodeURIComponent(userProfileMatch[1]) : userQueryId!
-      const name = query.name ? decodeURIComponent(query.name) : ''
-      const avatar = query.avatar ? decodeURIComponent(query.avatar) : ''
-      const userUrl = query.userUrl ? decodeURIComponent(query.userUrl) : ''
+      const userId = resolveUserId({ name: query.name, avatar: query.avatar, userId: rawUserId })
 
-      const userId = resolveUserId({ name: name || rawUserId, avatar, userId: rawUserId })
-
-      // 如果当前 URL 里的 userId 是非规范形式（例如中文名称），自动 replaceState 同步规范化地址栏
-      if (rawUserId !== userId && typeof window !== 'undefined') {
-        const correctPath = `/user/profile/${userId}`
-        const correctSearch = url.search
-        window.history.replaceState({}, '', `${correctPath}${correctSearch}`)
-      }
-
-      const author: Author = {
-        name: name || rawUserId,
-        avatar,
-        userId,
-        userUrl: userUrl || undefined,
+      // 清除任何多余的 query 参数（如 ?name=...&avatar=...），确保地址栏严格只有 /user/profile/:userId
+      if (typeof window !== 'undefined') {
+        const cleanPath = `/user/profile/${userId}`
+        if (window.location.pathname !== cleanPath || window.location.search) {
+          window.history.replaceState({}, '', cleanPath)
+        }
       }
 
       return {
         path: `/user/profile/${userId}`,
         name: 'user',
         userId,
-        author,
-        query,
+        query: {},
       }
     }
 
@@ -141,16 +130,11 @@ export function navigate(to: string, replace = false) {
 }
 
 /**
- * 跳转到指定博主详情页的路由包装工具（保证 URL 必带 24 位十六进制真实规范 userId）
+ * 跳转到指定博主详情页的路由包装工具（URL 仅保留标准 24 位十六进制 userId，其他信息完全走接口拉取）
  */
 export function openUserProfileRoute(author: Partial<Author> & { name?: string; avatar?: string; userId?: string; userUrl?: string }) {
   const userId = resolveUserId(author)
-  const qs = new URLSearchParams()
-  if (author.name) qs.set('name', author.name)
-  if (author.avatar) qs.set('avatar', author.avatar)
-  if (author.userUrl) qs.set('userUrl', author.userUrl)
-  const queryString = qs.toString() ? `?${qs.toString()}` : ''
-  navigate(`/user/profile/${userId}${queryString}`)
+  navigate(`/user/profile/${userId}`)
 }
 
 /**

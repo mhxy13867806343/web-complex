@@ -656,6 +656,30 @@ export async function fetchUserDetail(userId, name, avatar, token) {
   const cached = await readDisk(diskKey)
   if (cached) return cached
 
+  // 若未传 name / avatar，自动从内存、磁盘与静态 feed 中按 userId 反查博主基础信息
+  if (!name || !avatar) {
+    for (const entry of feedCache.values()) {
+      const found = entry.data?.notes?.find((n) => resolveUserId(n.author || {}) === finalUserId)
+      if (found?.author) {
+        if (!name) name = found.author.name
+        if (!avatar) avatar = found.author.avatar
+        break
+      }
+    }
+  }
+  if (!name || !avatar) {
+    const channels = ['推荐', '穿搭', '美食', '彩妆', '影视', '职场', '情感', '家居', '游戏', '旅行', '健身', '视频']
+    for (const ch of channels) {
+      const notes = await loadStaticFallbackFeed(ch)
+      const found = notes.find((n) => resolveUserId(n.author || {}) === finalUserId)
+      if (found?.author) {
+        if (!name) name = found.author.name
+        if (!avatar) avatar = found.author.avatar
+        break
+      }
+    }
+  }
+
   const seed = (name || finalUserId).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
   const follows = String(18 + (seed % 80))
   const fans = seed % 3 === 0 ? `${(1.2 + (seed % 20) * 0.3).toFixed(1)}万` : String(230 + (seed % 900))

@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Loading, Share } from '@nutui/icons-react'
-import type { Author, Note, UserProfileData } from '../data'
+import type { Note, UserProfileData } from '../data'
 import { fetchUserProfileApi } from '../data/api'
 import { Toast } from './Toast'
 import NoteCard from './NoteCard'
 
 interface Props {
-  userId?: string
-  author?: Author
+  userId: string
   knownNotes?: Note[]
   onBack: () => void
   onOpenNote: (note: Note) => void
 }
 
-export default function UserPage({ userId, author, knownNotes = [], onBack, onOpenNote }: Props) {
+export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'notes' | 'collects'>('notes')
@@ -21,20 +20,13 @@ export default function UserPage({ userId, author, knownNotes = [], onBack, onOp
   const [scrolled, setScrolled] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
 
-  // 进入页面时发起真实的 HTTP 请求拉取用户详情数据
+  // 进入页面时仅凭 userId 发起真实的 HTTP 请求拉取用户详情数据
   useEffect(() => {
+    if (!userId) return
     const ac = new AbortController()
     setLoading(true)
 
-    const avatarIdMatch = author?.avatar?.match(/avatar\/([a-f0-9]{24})/i)
-    const effectiveUserId = userId || author?.userId || (avatarIdMatch ? avatarIdMatch[1] : '')
-    const effectiveAuthor: Author = author || {
-      name: '',
-      avatar: '',
-      userId: effectiveUserId,
-    }
-
-    fetchUserProfileApi(effectiveUserId, effectiveAuthor, knownNotes, ac.signal)
+    fetchUserProfileApi(userId, undefined, knownNotes, ac.signal)
       .then((data) => {
         setProfile(data)
         setLoading(false)
@@ -45,7 +37,7 @@ export default function UserPage({ userId, author, knownNotes = [], onBack, onOp
       })
 
     return () => ac.abort()
-  }, [userId, author?.userId, author?.name, author?.avatar])
+  }, [userId])
 
   const handleBack = () => {
     if (isClosing) return
