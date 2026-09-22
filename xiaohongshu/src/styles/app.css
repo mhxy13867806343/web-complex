@@ -2538,3 +2538,28 @@
   border-radius: 16px;
   cursor: pointer;
 }
+
+/* 搜索页下拉刷新与无限加载底线提示 */
+.search-page-container .ptr {
+  background: #14151a;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.search-loadmore-trigger {
+  text-align: center;
+  padding: 18px 0 32px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.18s ease;
+}
+
+.search-loadmore-trigger:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.search-page-container .nut-infiniteloading,
+.search-page-container .nut-infinite__bottom {
+  color: rgba(255, 255, 255, 0.45);
+}

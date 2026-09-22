@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Home, Loading } from '@nutui/icons-react'
+import { BackTop, InfiniteLoading } from '@nutui/nutui-react'
 import type { Note } from '../data'
 import { fetchSearchResultsApi, type SearchResultData } from '../data/api'
+import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
+import { Toast } from './Toast'
 import Waterfall from './Waterfall'
 import { openSearchResultRoute } from '../router'
+
+const SCROLLER_SELECTOR = '#search-result-body'
+const SCROLLER_ID = 'search-result-body'
+
+/** 去重拼接 */
+function mergeNotes(head: Note[], tail: Note[]): Note[] {
+  const seen = new Set<string>()
+  const out: Note[] = []
+  for (const n of [...head, ...tail]) {
+    if (seen.has(n.id)) continue
+    seen.add(n.id)
+    out.push(n)
+  }
+  return out
+}
 
 interface Props {
   keyword: string
@@ -37,8 +55,33 @@ export default function SearchResult({
   const [distance, setDistance] = useState('all') // 'all' | 'city' | 'nearby'
 
   const [data, setData] = useState<SearchResultData | null>(null)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const loadingRef = useRef(false)
+  const loadingMoreRef = useRef(false)
+  const hasMoreRef = useRef(true)
+  const pageRef = useRef(1)
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    loadingRef.current = loading
+  }, [loading])
+
+  useEffect(() => {
+    loadingMoreRef.current = loadingMore
+  }, [loadingMore])
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore
+  }, [hasMore])
+
+  useEffect(() => {
+    pageRef.current = page
+  }, [page])
 
   // 当外部传入的 keyword 变更时同步
   useEffect(() => {
@@ -49,13 +92,22 @@ export default function SearchResult({
     }
   }, [keyword])
 
-  // 发起搜索拉取
+  // 发起搜索拉取（重置为第 1 页）
   const loadSearch = useCallback(
-    async (kw: string, currentSubTag = activeSubTag, currentSort = sort, currentType = noteType) => {
+    async (
+      kw: string,
+      currentSubTag = activeSubTag,
+      currentSort = sort,
+      currentType = noteType,
+      currentTime = timeRange,
+      currentScope = searchScope,
+      currentDist = distance
+    ) => {
       abortRef.current?.abort()
       const ac = new AbortController()
       abortRef.current = ac
       setLoading(true)
+      loadingRef.current = true
       try {
         const res = await fetchSearchResultsApi(
           kw,
@@ -63,27 +115,159 @@ export default function SearchResult({
             sort: currentSort,
             noteType: currentType,
             subTag: currentSubTag,
+            timeRange: currentTime,
+            searchScope: currentScope,
+            distance: currentDist,
+            page: 1,
+            pageSize: 12,
           },
           ac.signal
         )
         setData(res)
+        setNotes(res.notes || [])
+        setPage(1)
+        pageRef.current = 1
+        const more = res.hasMore ?? false
+        setHasMore(more)
+        hasMoreRef.current = more
+        document.getElementById(SCROLLER_ID)?.scrollTo({ top: 0 })
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           setData(null)
+          setNotes([])
+          setHasMore(false)
+          hasMoreRef.current = false
         }
       } finally {
         setLoading(false)
+        loadingRef.current = false
       }
     },
-    [activeSubTag, sort, noteType]
+    [activeSubTag, sort, noteType, timeRange, searchScope, distance]
   )
 
   useEffect(() => {
-    void loadSearch(currentKeyword, activeSubTag, sort, noteType)
+    void loadSearch(currentKeyword, activeSubTag, sort, noteType, timeRange, searchScope, distance)
     return () => {
       abortRef.current?.abort()
     }
-  }, [currentKeyword, activeSubTag, sort, noteType, loadSearch])
+  }, [currentKeyword, activeSubTag, sort, noteType, timeRange, searchScope, distance, loadSearch])
+
+  // 下拉刷新
+  const handleRefresh = useCallback(async () => {
+    try {
+      const res = await fetchSearchResultsApi(
+        currentKeyword,
+        {
+          sort,
+          noteType,
+          subTag: activeSubTag,
+          timeRange,
+          searchScope,
+          distance,
+          page: 1,
+          pageSize: 12,
+        }
+      )
+      setData(res)
+      setNotes(res.notes || [])
+      setPage(1)
+      pageRef.current = 1
+      const more = res.hasMore ?? false
+      setHasMore(more)
+      hasMoreRef.current = more
+      Toast.show({ content: '已刷新最新搜索笔记', duration: 1.5 })
+    } catch {
+      Toast.show({ content: '刷新失败，请稍后重试', duration: 1.5 })
+    }
+  }, [currentKeyword, sort, noteType, activeSubTag, timeRange, searchScope, distance])
+
+  const { distance: ptrDistance, pulling, refreshing } = usePullToRefresh(
+    SCROLLER_SELECTOR,
+    handleRefresh,
+    true
+  )
+
+  // 上拉加载下一页
+  const handleLoadMore = useCallback(async () => {
+    if (loadingRef.current || loadingMoreRef.current || !hasMoreRef.current) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    const nextPage = pageRef.current + 1
+    try {
+      const res = await fetchSearchResultsApi(
+        currentKeyword,
+        {
+          sort,
+          noteType,
+          subTag: activeSubTag,
+          timeRange,
+          searchScope,
+          distance,
+          page: nextPage,
+          pageSize: 12,
+        }
+      )
+      if (res.notes?.length) {
+        setNotes((prev) => mergeNotes(prev, res.notes))
+        setPage(nextPage)
+        pageRef.current = nextPage
+        const more = res.hasMore ?? false
+        setHasMore(more)
+        hasMoreRef.current = more
+      } else {
+        setHasMore(false)
+        hasMoreRef.current = false
+      }
+    } catch {
+      // ignore
+    } finally {
+      loadingMoreRef.current = false
+      setLoadingMore(false)
+    }
+  }, [currentKeyword, sort, noteType, activeSubTag, timeRange, searchScope, distance])
+
+  const onLoadMoreNutUI = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      if (loadingRef.current || loadingMoreRef.current || !hasMoreRef.current) {
+        resolve()
+        return
+      }
+      void handleLoadMore().then(() => {
+        resolve()
+      })
+    })
+  }, [handleLoadMore])
+
+  // 滚动触底检测双保险（同时监听容器和 window 滚动）
+  useEffect(() => {
+    const el = document.getElementById(SCROLLER_ID)
+    const checkAndLoad = () => {
+      if (loadingRef.current || loadingMoreRef.current || !hasMoreRef.current) return
+
+      let distanceToBottom = 9999
+      if (el && el.scrollHeight > el.clientHeight) {
+        distanceToBottom = Math.min(distanceToBottom, el.scrollHeight - el.clientHeight - el.scrollTop)
+      }
+      const winScrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0
+      const winHeight = window.innerHeight || document.documentElement.clientHeight || 0
+      const winScrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0
+      if (winScrollHeight > winHeight) {
+        distanceToBottom = Math.min(distanceToBottom, winScrollHeight - winHeight - winScrollTop)
+      }
+
+      if (distanceToBottom <= 260) {
+        void handleLoadMore()
+      }
+    }
+
+    el?.addEventListener('scroll', checkAndLoad, { passive: true })
+    window.addEventListener('scroll', checkAndLoad, { passive: true })
+    return () => {
+      el?.removeEventListener('scroll', checkAndLoad)
+      window.removeEventListener('scroll', checkAndLoad)
+    }
+  }, [handleLoadMore])
 
   // 执行搜索
   const doSearch = (newKw?: string) => {
@@ -133,7 +317,12 @@ export default function SearchResult({
     }, 200)
   }
 
-  const notesList = data?.notes || []
+  const notesList = notes
+  const pullText = refreshing
+    ? '正在刷新…'
+    : ptrDistance >= PTR_TRIGGER
+    ? '松手立即刷新'
+    : '下拉刷新'
   const subTagsList = data?.subTags || [
     '综合',
     '西安',
@@ -441,7 +630,16 @@ export default function SearchResult({
       )}
 
       {/* 搜索结果内容区 */}
-      <div className="search-result-body">
+      <div className="search-result-body" id={SCROLLER_ID}>
+        {/* 下拉刷新提示区：随手指/鼠标下拉位移撑开高度 */}
+        <div
+          className={`ptr${pulling ? ' pulling' : ''}`}
+          style={{ height: ptrDistance }}
+          aria-hidden={ptrDistance === 0}
+        >
+          <span>{pullText}</span>
+        </div>
+
         {loading ? (
           <div className="search-loading-box">
             <Loading>正在搜索相关笔记…</Loading>
@@ -482,15 +680,42 @@ export default function SearchResult({
             <div className="search-empty-tip">试试搜索其他关键词或精简筛选条件</div>
           </div>
         ) : (
-          <div className="search-waterfall-wrap">
-            <Waterfall
-              notes={notesList}
-              onOpen={onOpenNote}
-              onOpenUser={(author) => onOpenUser(author)}
-            />
-          </div>
+          <>
+            <div className="search-waterfall-wrap">
+              <Waterfall
+                notes={notesList}
+                onOpen={onOpenNote}
+                onOpenUser={(author) => onOpenUser(author)}
+              />
+            </div>
+            <div
+              className="search-loadmore-trigger"
+              onClick={() => {
+                if (!loadingMore && hasMore) {
+                  void handleLoadMore()
+                }
+              }}
+            >
+              {loadingMore ? '正在加载更多…' : hasMore ? '上拉或点击加载更多' : '— 我是有底线的 —'}
+            </div>
+          </>
         )}
       </div>
+
+      <InfiniteLoading
+        hasMore={hasMore}
+        threshold={180}
+        target={SCROLLER_ID}
+        loadingText="正在加载更多…"
+        loadMoreText="— 我是有底线的 —"
+        onLoadMore={onLoadMoreNutUI}
+      />
+
+      <BackTop
+        target={SCROLLER_ID}
+        threshold={240}
+        duration={500}
+      />
     </div>
   )
 }

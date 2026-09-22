@@ -359,6 +359,8 @@ export interface SearchFilterOptions {
   timeRange?: string
   searchScope?: string
   distance?: string
+  page?: number
+  pageSize?: number
 }
 
 export interface SearchResultData {
@@ -367,6 +369,9 @@ export interface SearchResultData {
   activeSubTag: string
   total: number
   notes: Note[]
+  page?: number
+  pageSize?: number
+  hasMore?: boolean
 }
 
 /**
@@ -383,6 +388,8 @@ export async function fetchSearchResultsApi(
   if (options.sort) qs.set('sort', options.sort)
   if (options.noteType) qs.set('note_type', options.noteType)
   if (options.subTag) qs.set('sub_tag', options.subTag)
+  if (options.page) qs.set('page', String(options.page))
+  if (options.pageSize) qs.set('pageSize', String(options.pageSize))
 
   const path = `/api/xhs/search?${qs.toString()}`
   const url = base ? `${base.replace(/\/$/, '')}${path}` : path
@@ -396,12 +403,51 @@ export async function fetchSearchResultsApi(
     if ((e as Error)?.name === 'AbortError') throw e
   }
 
+  // 静态或离线兜底：从 STATIC_FEEDS 检索
+  const pool: Note[] = []
+  for (const list of Object.values(STATIC_FEEDS)) {
+    pool.push(...list)
+  }
+  const kwLower = (keyword || '').toLowerCase()
+  let matched = pool.filter((n) => {
+    return (
+      (n.title && n.title.toLowerCase().includes(kwLower)) ||
+      (n.desc && n.desc.toLowerCase().includes(kwLower)) ||
+      (n.tags && n.tags.some((t) => t.toLowerCase().includes(kwLower))) ||
+      (n.author?.name && n.author.name.toLowerCase().includes(kwLower))
+    )
+  })
+  if (matched.length === 0) {
+    matched = pool.slice(0, 24)
+  }
+  if (options.noteType === 'video') {
+    matched = matched.filter((n) => n.type === 'video' || Boolean((n as any).isVideo))
+  } else if (options.noteType === 'image') {
+    matched = matched.filter((n) => n.type !== 'video' && !(n as any).isVideo)
+  }
+  if (options.sort === 'most_likes') {
+    matched.sort((a, b) => {
+      const numB = parseInt(String(b.likes || '0').replace(/[^0-9]/g, ''), 10) || 0
+      const numA = parseInt(String(a.likes || '0').replace(/[^0-9]/g, ''), 10) || 0
+      return numB - numA
+    })
+  }
+
+  const p = Math.max(1, options.page || 1)
+  const ps = Math.max(1, options.pageSize || 12)
+  const start = (p - 1) * ps
+  const pagedNotes = matched.slice(start, start + ps)
+  const hasMore = start + ps < matched.length
+
   return {
     keyword,
     subTags: ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略'],
     activeSubTag: options.subTag || '综合',
-    total: 0,
-    notes: [],
+    total: matched.length,
+    notes: pagedNotes,
+    page: p,
+    pageSize: ps,
+    hasMore,
   }
 }
 

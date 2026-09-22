@@ -772,7 +772,14 @@ export async function fetchUserDetail(userId, name, avatar, token) {
 /**
  * 搜索笔记（对齐小红书官方搜索结果页 /search_result/?keyword=...）
  */
-export async function searchNotesApi({ keyword = '', sort = 'general', noteType = 'all', subTag = '' }) {
+export async function searchNotesApi({
+  keyword = '',
+  sort = 'general',
+  noteType = 'all',
+  subTag = '',
+  page = 1,
+  pageSize = 12,
+}) {
   const kw = keyword.replace(/^#/, '').trim().toLowerCase()
   const isVlog = kw.includes('vlog')
   const isMovieNight =
@@ -1111,12 +1118,21 @@ export async function searchNotesApi({ keyword = '', sort = 'general', noteType 
     allNotes.sort((a, b) => ((b.likes || 0) * 0.4) - ((a.likes || 0) * 0.4))
   }
 
+  const p = Math.max(1, parseInt(page || '1', 10))
+  const ps = Math.max(1, parseInt(pageSize || '12', 10))
+  const start = (p - 1) * ps
+  const pagedNotes = allNotes.slice(start, start + ps)
+  const hasMore = start + ps < allNotes.length
+
   return {
     keyword,
     subTags,
     activeSubTag: subTag || '综合',
+    page: p,
+    pageSize: ps,
+    hasMore,
     total: allNotes.length,
-    notes: allNotes.slice(0, 30),
+    notes: pagedNotes,
   }
 }
 
@@ -1196,7 +1212,9 @@ export function buildXhsHandler() {
         const sort = u.searchParams.get('sort') || 'general'
         const noteType = u.searchParams.get('note_type') || 'all'
         const subTag = u.searchParams.get('sub_tag') || ''
-        const data = await searchNotesApi({ keyword, sort, noteType, subTag })
+        const page = Math.max(1, parseInt(u.searchParams.get('page') || '1', 10))
+        const pageSize = Math.max(1, parseInt(u.searchParams.get('pageSize') || '12', 10))
+        const data = await searchNotesApi({ keyword, sort, noteType, subTag, page, pageSize })
         return send(res, 200, data)
       }
       if (u.pathname === '/user') {
