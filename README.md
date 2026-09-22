@@ -87,7 +87,7 @@ npm run dev                       # 终端打印地址（5173 被占会自动顺
 # 或本地生产预览：npm run build && npm run start
 ```
 
-- **在线预览（GitHub Pages）**：[直接体验入口](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)（推到 `main` 后由 `.github/workflows/deploy.yml` 自动构建发布）。
+- **在线预览（GitHub Pages）**：[直接体验入口](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)（推到 `main` 后由 `.github/workflows/deploy.yml` 自动构建发布）。笔记地址用 `#/explore/笔记id`，不要写成 `github.io/explore/笔记id`。
 - **全功能独立在线服务**：[https://xhs-explore.app.workbuddy.host/](https://xhs-explore.app.workbuddy.host/)（含实时 Node 抓取后端）。
 - 桌面端打开会渲染成一台居中的「手机」，窄屏或手机浏览器下铺满全屏。
 

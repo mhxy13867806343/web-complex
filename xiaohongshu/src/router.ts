@@ -47,6 +47,47 @@ export function resolveUserId(author: { name?: string; avatar?: string; userId?:
   return `${p1}${p2}${p3}`
 }
 
+/** GitHub Pages 的站点目录，或本地 dev 的 /、index.html。这类地址才是能打开的页面文件。 */
+function isShellPath(pathname: string) {
+  return pathname === '/' || pathname === '' || pathname.endsWith('/index.html') || /\/xiaohongshu\/?$/.test(pathname)
+}
+
+/** 路由写在 hash 里，避免把 /explore/:id 写成站点根路径后在 GitHub Pages 上 404。 */
+function applyRoute(to: string, replace: boolean) {
+  const route = to.startsWith('#') ? to.slice(1) : to
+  const hash = `#${route.startsWith('/') ? route : `/${route}`}`
+  const pathname = isShellPath(window.location.pathname) ? window.location.pathname : '/'
+  const next = `${pathname}${window.location.search}${hash}`
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  if (next === current) return
+  if (replace) window.history.replaceState({}, '', next)
+  else window.history.pushState({}, '', next)
+}
+
+function hashPathname() {
+  const hash = window.location.hash
+  if (!hash.startsWith('#/')) return ''
+  const body = hash.slice(1)
+  const queryAt = body.indexOf('?')
+  return queryAt >= 0 ? body.slice(0, queryAt) : body
+}
+
+function normalizeAddressBar(cleanPath: string) {
+  if (typeof window === 'undefined') return
+  if (hashPathname() === cleanPath && isShellPath(window.location.pathname)) return
+  applyRoute(cleanPath, true)
+}
+
+/** 当前应用内路径。优先读 #/explore/:id，站点目录本身视为首页。 */
+export function currentRoutePath(): string {
+  if (typeof window === 'undefined') return '/'
+  const fromHash = hashPathname()
+  if (fromHash) return fromHash
+  const pathname = window.location.pathname
+  if (isShellPath(pathname)) return '/'
+  return pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+}
+
 /**
  * 解析当前浏览器地址为规范化路由信息
  */
@@ -87,12 +128,8 @@ export function parseRoute(rawUrl?: string): RouteInfo {
       const rawUserId = userProfileMatch ? decodeURIComponent(userProfileMatch[1]) : userQueryId!
       const userId = resolveUserId({ name: query.name, avatar: query.avatar, userId: rawUserId })
 
-      // 清除任何多余的 query 参数（如 ?name=...&avatar=...），确保地址栏严格只有 /user/profile/:userId
-      if (typeof window !== 'undefined') {
-        const cleanPath = `/user/profile/${userId}`
-        if (window.location.pathname !== cleanPath || window.location.search) {
-          window.history.replaceState({}, '', cleanPath)
-        }
+      if (typeof window !== 'undefined' && !rawUrl) {
+        normalizeAddressBar(`/user/profile/${userId}`)
       }
 
       return {
@@ -110,8 +147,8 @@ export function parseRoute(rawUrl?: string): RouteInfo {
     if (noteMatch || (noteQueryId && pathname === '/')) {
       const noteId = noteMatch ? decodeURIComponent(noteMatch[1]) : noteQueryId!
       const cleanPath = `/explore/${noteId}`
-      if (typeof window !== 'undefined' && window.location.pathname !== cleanPath) {
-        window.history.replaceState({}, '', cleanPath)
+      if (typeof window !== 'undefined' && !rawUrl) {
+        normalizeAddressBar(cleanPath)
       }
 
       return {
@@ -224,15 +261,11 @@ const ROUTE_EVENT = 'app:routechange'
 export function navigate(to: string, replace = false) {
   if (typeof window === 'undefined') return
   try {
-    if (replace) {
-      window.history.replaceState({}, '', to)
-    } else {
-      window.history.pushState({}, '', to)
-    }
+    applyRoute(to, replace)
     window.dispatchEvent(new Event(ROUTE_EVENT))
     window.dispatchEvent(new PopStateEvent('popstate'))
   } catch {
-    window.location.href = to
+    window.location.hash = to.startsWith('#') ? to : `#${to}`
   }
 }
 
@@ -268,7 +301,7 @@ export function openSearchResultRoute(keyword: string, options?: { type?: string
  */
 function redirectAwayFromLive() {
   if (typeof window === 'undefined') return
-  const path = window.location.pathname
+  const path = currentRoutePath()
   if (path === '/livelist' || path.startsWith('/livestream')) {
     navigate(getExploreUrl(), true)
   }
@@ -281,7 +314,7 @@ export function useRoute(): RouteInfo {
     redirectAwayFromLive()
     const handleRouteChange = () => {
       dismissRequestToast()
-      if (window.location.pathname === '/livelist' || window.location.pathname.startsWith('/livestream')) {
+      if (currentRoutePath() === '/livelist' || currentRoutePath().startsWith('/livestream')) {
         navigate(getExploreUrl(), true)
         return
       }

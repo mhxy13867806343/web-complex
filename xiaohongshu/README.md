@@ -154,6 +154,7 @@ xiaohongshu/
 
 - **🌐 GitHub Pages 在线预览（静态打包 + Actions 自动发布）**：
   - **预览地址**：[https://mhxy13867806343.github.io/web-complex/xiaohongshu/](https://mhxy13867806343.github.io/web-complex/xiaohongshu/)
+  - 笔记详情走 hash，例如 `#/explore/笔记id`。GitHub Pages 没有 `/explore/笔记id` 这个文件，写成站点根路径会 404。
   - 已通过仓库 `.github/workflows/deploy.yml` 配置 GitHub Actions 自动构建与发布；
   - 静态页面采用相对路径 `base: './'` 打包，纯静态环境自动请求独立后端接口服务，并在遇到网络或小红书风控时无缝降级到本地精选兜底数据，确保页面稳定展示。
 - **⚡ 全功能独立服务（Node 实时抓取）**：

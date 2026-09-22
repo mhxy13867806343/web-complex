@@ -5,7 +5,7 @@ import { fetchChannels, fetchFeed, fetchHotSearchesApi, type HotSearchItem } fro
 import { useSearchHistory } from '../utils/searchHistory'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
-import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute } from '../router'
+import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute, currentRoutePath } from '../router'
 import ChannelChips from './ChannelChips'
 import { beginRequestToast, endRequestToast } from '../utils/loadingToast'
 import Waterfall from './Waterfall'
@@ -28,16 +28,11 @@ const INITIAL_CHANNELS = [RECOMMEND, ...STATIC_CHANNELS.map((c) => c.name)]
 function getInitialChannel(): string {
   if (typeof window === 'undefined') return RECOMMEND
   try {
-    const params = new URLSearchParams(window.location.search)
+    const hash = window.location.hash
+    const queryAt = hash.startsWith('#/') ? hash.indexOf('?') : -1
+    const params = new URLSearchParams(queryAt >= 0 ? hash.slice(queryAt + 1) : window.location.search)
     const q = params.get('channel') || params.get('tab')
     if (q) return decodeURIComponent(q).trim()
-    const hash = window.location.hash.replace(/^#\/?/, '').trim()
-    if (hash) {
-      const hashParams = new URLSearchParams(hash)
-      const hq = hashParams.get('channel') || hashParams.get('tab')
-      if (hq) return decodeURIComponent(hq).trim()
-      return decodeURIComponent(hash).trim()
-    }
   } catch {
     /* fallback */
   }
@@ -50,12 +45,10 @@ function syncUrlChannel(ch: string) {
   if (typeof window === 'undefined') return
   try {
     const url = new URL(window.location.href)
-    if (ch && ch !== RECOMMEND) {
-      url.searchParams.set('channel', ch)
-    } else {
-      url.searchParams.delete('channel')
-    }
-    window.history.pushState({ channel: ch }, '', url.toString())
+    url.searchParams.delete('channel')
+    url.searchParams.delete('tab')
+    url.hash = !ch || ch === RECOMMEND ? '/' : `/?channel=${encodeURIComponent(ch)}`
+    window.history.pushState({ channel: ch }, '', `${url.pathname}${url.search}${url.hash}`)
   } catch {
     /* ignore */
   }
@@ -74,7 +67,7 @@ function mergeNotes(head: Note[], tail: Note[]): Note[] {
 }
 
 function isHomePath() {
-  const path = window.location.pathname
+  const path = currentRoutePath()
   return path === '/' || path === ''
 }
 
