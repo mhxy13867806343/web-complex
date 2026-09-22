@@ -81,7 +81,7 @@ export default function NoteDetail({ note, collected, onCollect, onClose }: Prop
     const ac = new AbortController()
 
     // 先抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
-    fetchNoteDetail(note.id, note.noteUrl, ac.signal)
+    fetchNoteDetail(note.id, note.noteUrl, note, ac.signal)
       .then((detailRes) => {
         setDetail(detailRes)
         const realTitle = detailRes.title || note.title || ''
