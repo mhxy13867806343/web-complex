@@ -775,18 +775,139 @@ export async function fetchUserDetail(userId, name, avatar, token) {
 export async function searchNotesApi({ keyword = '', sort = 'general', noteType = 'all', subTag = '' }) {
   const kw = keyword.replace(/^#/, '').trim().toLowerCase()
   const isVlog = kw.includes('vlog')
+  const isMovieNight =
+    kw.includes('了不起') ||
+    (kw.includes('电影') && (kw.includes('夜晚') || kw.includes('了不起'))) ||
+    kw.includes('夜晚')
 
-  // 二级热词/标签栏（图 2 原汁原味）
+  // 二级热词/标签栏（对齐图 1 & 图 2）
   let subTags = ['综合', '最新分享', '热门推荐', '高赞精选', '生活记录', '实用攻略']
-  if (isVlog) {
+  if (isMovieNight) {
+    subTags = ['综合', '完整版', '电影口碑', '精彩时刻', '影视解说', '喜剧片段', '花絮', '高清在线', '幕后揭秘']
+  } else if (isVlog) {
     subTags = ['综合', '西安', '日常生活', '杭州', '上学日记', '南京', '长沙', '治愈系', '新加坡', '打工人', '青岛', '马来西亚']
   } else if (kw.includes('生活') || kw.includes('日常')) {
     subTags = ['综合', '独居生活', '日常随拍', '周末去哪儿', '自律', '治愈系', '好物', '美食记录']
   } else if (kw.includes('好物') || kw.includes('推荐')) {
     subTags = ['综合', '数码家电', '居家好物', '护肤彩妆', '平价好物', '踩雷避坑', '学生党', '租房神器']
+  } else if (kw.includes('电影') || kw.includes('影视') || kw.includes('剧')) {
+    subTags = ['综合', '高分电影', '电影解说', '周末追剧', '院线热映', '高能名场面', '幕后花絮', '影评']
   }
 
-  // 1. 图 2 对应的高保真 Vlog 精品卡片
+  // 1. 图 1 电影《了不起的夜晚》高保真真实卡片集
+  const movieNightNotes = [
+    {
+      id: 'movie_night_1',
+      title: '了不起的夜晚 精彩时刻',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/f810f3c84121eaf170d82b8a0730e499/1000g0082q5lf036k806g489c281532ck2k25d2o!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 172,
+      author: {
+        name: '特拉仔电影',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg',
+        userId: '6054fe950000000005774a42',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/6054fe950000000005774a42',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '喜剧电影', '精彩时刻', '影视剪辑'],
+      date: '02-25',
+    },
+    {
+      id: 'movie_night_2',
+      title: '你以为你已经知道了不起的夜晚',
+      desc: '如果她只是一个饰演女鬼“丽妃”的人类演员……电影《了不起的夜晚》正在热映中！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/726ff98e9eb3c84c843366f21dabf074/1040g00830mvolhq254205o5oo17g8iuetklvnn0!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 377,
+      author: {
+        name: '猫眼电影',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+        userId: '5d69dbca00000000010081fc',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5d69dbca00000000010081fc',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '猫眼电影', '影视推荐'],
+      date: '03-19',
+    },
+    {
+      id: 'movie_night_3',
+      title: '两个清装人 经典喜剧高能名场面反转！',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/a8cbcae0deaac0c412d10304c112edf5/1040g00830mq31cqjkme05obuia40ko9skr01s20!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 48,
+      author: {
+        name: '爱吃西瓜心',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/54eefc3c0000000005600160.jpg',
+        userId: '54eefc3c0000000005600160',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/54eefc3c0000000005600160',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '惊悚喜剧', '高能名场面'],
+      date: '07-05',
+    },
+    {
+      id: 'movie_night_4',
+      title: '《了不起的夜晚》沉浸式追剧解说 爆笑惊悚两不误',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/193b8c0824eaa2c1c77f37c27029c899/1040g00830ms75ej8ki005o1c54c0bid2gj8cp98!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 210,
+      author: {
+        name: '锦鲤影视',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5a4d3f3a000000000b8c6995.jpg',
+        userId: '5a4d3f3a000000000b8c6995',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/5a4d3f3a000000000b8c6995',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '影视解说', '周末看电影'],
+      date: '07-26',
+    },
+    {
+      id: 'movie_night_5',
+      title: '“女孩吊威亚拍戏出意外” 幕后花絮大揭秘',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/4e24a0689278cb5a3ceb40670e6f7eb7/1000g0082qhbmcriju06g5ok7o0j8crmm66h298g!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 70,
+      author: {
+        name: '红薯影视',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/502436640000000004908972.jpg',
+        userId: '502436640000000004908972',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/502436640000000004908972',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '拍戏花絮', '电影幕后'],
+      date: '09-14',
+    },
+    {
+      id: 'movie_night_6',
+      title: '导演：没想到你演技这么逼真啊 我还真是小瞧你了',
+      cover: 'https://sns-webpic-qc.xhscdn.com/202609221359/808b2812fa5cf182a2b3ee025d9fa01b/1040g00830mqtgabhkm004a5stg0svks5otci080!nc_n_nwebp_mw_1',
+      coverWidth: 1080,
+      coverHeight: 1440,
+      type: 'video',
+      isVideo: true,
+      likes: 14,
+      author: {
+        name: 'cx',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64159a23aab651ae65a49601.jpg',
+        userId: '64159a23aab651ae65a49601',
+        userUrl: 'https://www.xiaohongshu.com/user/profile/64159a23aab651ae65a49601',
+      },
+      tags: ['电影了不起的夜晚', '了不起的夜晚', '演技高光', '爆笑'],
+      date: '09-14',
+    },
+  ]
+
+  // 2. 图 2 对应的高保真 Vlog 精品卡片
   const vlogSpecialNotes = [
     {
       id: 'vlog_hike_beigaofeng',
@@ -848,46 +969,25 @@ export async function searchNotesApi({ keyword = '', sort = 'general', noteType 
       tags: ['vlog', '独居生活', '收纳', '自律', '生活记录'],
       date: '08-13',
     },
-    {
-      id: 'vlog_cafe_weekend_relax',
-      title: '独处日记 ☕️ 找一家街角咖啡馆发呆的下午',
-      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/c075057b19cb3197be34f741bcf63e8d/1000g0082pbq9kvkjq0004a3p3ru0doovflf75r0!nc_n_nwebp_mw_1',
-      author: {
-        name: '夏天的风',
-        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64159a23aab651ae65a49601.jpg',
-        userId: '64159a23aab651ae65a49601',
-        userUrl: 'https://www.xiaohongshu.com/user/profile/64159a23aab651ae65a49601',
-      },
-      likes: 4320,
-      isVideo: false,
-      tags: ['vlog', '生活记录', '咖啡馆', '治愈系'],
-      date: '07-29',
-    },
-    {
-      id: 'vlog_student_study_routine',
-      title: '大学生日记 | 考研人自律高效的一天学习vlog 📖',
-      cover: 'https://sns-webpic-qc.xhscdn.com/202609221352/11934cf722a7c27fef250d26ed436de5/1000g0082onup4psk606g5om83em0g6c87aafun0!nc_n_nwebp_mw_1',
-      author: {
-        name: '晨曦Study',
-        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/502436640000000004908972.jpg',
-        userId: '502436640000000004908972',
-        userUrl: 'https://www.xiaohongshu.com/user/profile/502436640000000004908972',
-      },
-      likes: 5420,
-      isVideo: true,
-      tags: ['vlog', '上学日记', '自律', '生活记录', '南京'],
-      date: '09-10',
-    },
   ]
 
-  // 2. 从全站所有磁盘缓存频道与静态池中搜寻
+  // 3. 从全站所有磁盘缓存频道与静态池中搜寻
   let pool = []
   try {
     const files = await fs.readdir(DISK_DIR)
     for (const file of files) {
       if (file.startsWith('feed%3A') && file.endsWith('.json')) {
-        const feedData = await readDisk(decodeURIComponent(file.replace(/\.json$/, '')))
-        if (feedData?.notes) pool.push(...feedData.notes)
+        const channelName = decodeURIComponent(file.replace(/^feed%3A/, '').replace(/\.json$/, ''))
+        const feedData = JSON.parse(await fs.readFile(path.join(DISK_DIR, file), 'utf8'))
+        if (feedData?.notes) {
+          for (const n of feedData.notes) {
+            pool.push({
+              ...n,
+              channel: channelName,
+              tags: Array.isArray(n.tags) ? [...n.tags, channelName] : [channelName],
+            })
+          }
+        }
       }
     }
   } catch {}
@@ -896,23 +996,90 @@ export async function searchNotesApi({ keyword = '', sort = 'general', noteType 
     const channels = ['推荐', '影视', '穿搭', '美食', '职场', '彩妆']
     for (const ch of channels) {
       const list = await loadStaticFallbackFeed(ch)
-      pool.push(...list)
+      for (const n of list) {
+        pool.push({
+          ...n,
+          channel: ch,
+          tags: Array.isArray(n.tags) ? [...n.tags, ch] : [ch],
+        })
+      }
     }
   }
 
-  let allNotes = isVlog ? [...vlogSpecialNotes] : []
+  // 准备初始置顶匹配集合
+  let allNotes = []
+  if (isMovieNight) {
+    allNotes.push(...movieNightNotes)
+  } else if (isVlog) {
+    allNotes.push(...vlogSpecialNotes)
+  }
+
   const seen = new Set(allNotes.map((n) => n.id))
 
+  // 行业与频道同义词扩展
+  const channelSynonyms = {
+    '美食': ['美食', '吃', '好吃', '做饭', '甜品', '蛋糕', '面条', '菜谱', '晚餐', '午餐', '早餐', '夜宵', '面包', '冰淇淋'],
+    '影视': ['影视', '电影', '电视剧', '了不起的夜晚', '剧', '影评', '演员', '导演', '票房', '看电影', '追剧', '夜晚'],
+    '穿搭': ['穿搭', '衣服', '裙子', '裤子', 'ootd', '显瘦', '外套', '夏装', '秋装', '时尚'],
+    '彩妆': ['彩妆', '美妆', '口红', '化妆', '粉底', '眼影', '美甲', '护肤', '防晒', '遮瑕'],
+    '职场': ['职场', '工作', '打工', '面试', '上班', '简历', '同事', '跳槽', '求职'],
+  }
+
+  // 生成分词 token 列表（多字符滑动切片 + 语义词）
+  const cleanTokens = [kw]
+  for (let len = 4; len >= 2; len--) {
+    for (let i = 0; i <= kw.length - len; i++) {
+      const sub = kw.slice(i, i + len)
+      if (!cleanTokens.includes(sub)) cleanTokens.push(sub)
+    }
+  }
+
+  // 模糊加权打分匹配
+  const scoredNotes = []
   for (const n of pool) {
     if (seen.has(n.id)) continue
-    const titleMatch = (n.title || '').toLowerCase().includes(kw)
-    const descMatch = (n.desc || '').toLowerCase().includes(kw)
-    const tagMatch = (n.tags || []).some((t) => t.toLowerCase().includes(kw))
-    const authorMatch = (n.author?.name || '').toLowerCase().includes(kw)
-    if (!kw || titleMatch || descMatch || tagMatch || authorMatch || isVlog) {
-      seen.add(n.id)
-      allNotes.push(n)
+    const title = (n.title || '').toLowerCase()
+    const desc = (n.desc || '').toLowerCase()
+    const tags = (n.tags || []).map((t) => t.toLowerCase())
+    const author = (n.author?.name || '').toLowerCase()
+    const fullText = `${title} ${desc} ${tags.join(' ')} ${author}`
+
+    let score = 0
+    if (fullText.includes(kw)) {
+      score += 120
     }
+
+    for (const token of cleanTokens) {
+      if (!token || token.length < 2) continue
+      if (title.includes(token)) score += 25 * token.length
+      if (tags.some((t) => t.includes(token))) score += 20 * token.length
+      if (desc.includes(token)) score += 10 * token.length
+      if (author.includes(token)) score += 15 * token.length
+    }
+
+    // 行业同义词加权
+    for (const [chName, syns] of Object.entries(channelSynonyms)) {
+      if (syns.some((syn) => kw.includes(syn) || cleanTokens.includes(syn))) {
+        if (n.channel === chName || tags.includes(chName.toLowerCase())) {
+          score += 45
+        }
+      }
+    }
+
+    if (score > 0) {
+      seen.add(n.id)
+      scoredNotes.push({ note: n, score })
+    }
+  }
+
+  scoredNotes.sort((a, b) => b.score - a.score)
+  allNotes.push(...scoredNotes.map((s) => s.note))
+
+  // 兜底保护：若任何词都匹配不到，拉取最相关的热门频道内容，绝不让用户看到空屏
+  if (allNotes.length === 0) {
+    const isMovieRelated = kw.includes('影') || kw.includes('剧') || kw.includes('电影') || kw.includes('夜')
+    const fallbackNotes = (await readDisk(isMovieRelated ? 'feed:影视' : 'feed:推荐'))?.notes || []
+    allNotes = fallbackNotes.slice(0, 16)
   }
 
   // 二级 subTag 联动筛选
