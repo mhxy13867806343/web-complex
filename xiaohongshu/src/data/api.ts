@@ -18,6 +18,7 @@ export interface FeedResult {
   fetchedAt: string
   count: number
   notes: Note[]
+  page?: number
   cached?: boolean
   stale?: boolean
 }
@@ -50,10 +51,10 @@ function isStaticEnvironment(): boolean {
   if (typeof window === 'undefined') return true
   // 显式指定了自定义 API
   if (import.meta.env?.VITE_API_BASE) return false
+  // 生产构建产物（dist 目录）或 GitHub Pages 静态环境
+  if (import.meta.env?.PROD) return true
   const host = window.location.hostname
-  // GitHub Pages 域名
   if (host.endsWith('github.io') || host.endsWith('gitee.io')) return true
-  // 非本地开发环境默认走静态 API
   return !['localhost', '127.0.0.1', '0.0.0.0'].includes(host)
 }
 
@@ -91,33 +92,41 @@ export async function fetchFeed(
   opts: { signal?: AbortSignal; more?: boolean } = {}
 ) {
   const ch = channel || '推荐'
-  if (isStaticEnvironment()) {
-    let page = channelPageMap.get(ch) || 1
-    if (opts.more) {
-      page += 1
-      channelPageMap.set(ch, page)
-    } else {
-      page = 1
-      channelPageMap.set(ch, 1)
-    }
+  let page = channelPageMap.get(ch) || 1
+  if (opts.more) {
+    page += 1
+    channelPageMap.set(ch, page)
+  } else {
+    page = 1
+    channelPageMap.set(ch, 1)
+  }
 
+  if (isStaticEnvironment()) {
     try {
-      // 每次切换 tab 或刷新，均发起真实的同源 Fetch 请求（以 homefeed_ 开头匹配搜索）
+      // 每次切 tab、刷新或上拉加载，均发起真实的同源 Fetch / Ajax 请求
       const fileKey = CHANNEL_API_MAP[ch] || 'homefeed_recommend'
-      const url = `./api/${fileKey}.json?t=${Date.now()}&fresh=${opts.more ? 1 : 0}`
+      const action = opts.more ? 'loadmore' : 'refresh'
+      const url = `./api/${fileKey}.json?page=${page}&action=${action}&t=${Date.now()}`
       const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
       if (res.ok) {
         const data = (await res.json()) as FeedResult
         const pool = data.notes || []
         if (pool.length > 0) {
-          const pageSize = 12
+          const pageSize = 10
           const start = ((page - 1) * pageSize) % pool.length
           const selected: Note[] = []
-          for (let i = 0; i < Math.min(pageSize, pool.length); i++) {
-            selected.push(pool[(start + i) % pool.length])
+          for (let i = 0; i < pageSize; i++) {
+            const raw = pool[(start + i) % pool.length]
+            // 为上拉加载附加对应页码的唯一 ID，确保不会被前端 Set 过滤并能无限追加
+            selected.push({
+              ...raw,
+              id: page > 1 ? `${raw.id}_p${page}_${i}` : raw.id,
+              title: page > 1 ? `[${ch}·第${page}页] ${raw.title}` : raw.title,
+            })
           }
           return {
             ...data,
+            page,
             fetchedAt: new Date().toISOString(),
             notes: selected,
             count: selected.length,
@@ -127,15 +136,19 @@ export async function fetchFeed(
     } catch {
       /* 静默降级 */
     }
-    return getStaticFeed(ch, page, 12)
+    return { ...getStaticFeed(ch, page, 10), page }
   }
 
   const base = getApiBase()
   const qs = new URLSearchParams({ channel: ch })
   if (opts.more) qs.set('fresh', '1')
+  qs.set('page', String(page))
+  qs.set('action', opts.more ? 'loadmore' : 'refresh')
+  qs.set('t', String(Date.now()))
   const path = `/api/xhs/feed?${qs.toString()}`
   const url = base ? `${base.replace(/\/$/, '')}${path}` : path
   const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return (await res.json()) as FeedResult
+  const data = (await res.json()) as FeedResult
+  return { ...data, page }
 }

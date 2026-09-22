@@ -40,14 +40,14 @@ const MOCK_NOTES = Array.from({ length: 24 }, (_, i) => ({
 function installFetchStub() {
   const handler = async (url: string) => {
     const u = new URL(url, 'http://localhost')
-    if (u.pathname === '/api/xhs/channels') {
+    if (u.pathname === '/api/xhs/channels' || u.pathname.endsWith('channels.json')) {
       return {
         ok: true,
         status: 200,
         json: async () => ({ fetchedAt: new Date().toISOString(), channels: MOCK_CHANNELS }),
       }
     }
-    if (u.pathname === '/api/xhs/feed') {
+    if (u.pathname === '/api/xhs/feed' || u.pathname.includes('homefeed_')) {
       const ch = u.searchParams.get('channel') || '推荐'
       return {
         ok: true,

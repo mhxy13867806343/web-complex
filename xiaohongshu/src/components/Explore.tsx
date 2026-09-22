@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
-import { PAGE_SIZE, type Note } from '../data'
+import type { Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import ChannelChips from './ChannelChips'
@@ -32,77 +32,71 @@ function mergeNotes(head: Note[], tail: Note[]): Note[] {
 export default function Explore() {
   const [channels, setChannels] = useState<string[]>([RECOMMEND])
   const [channel, setChannel] = useState<string>(RECOMMEND)
-  /** 每个流抓到的笔记（新抓的排前面） */
+  /** 每个流抓到的笔记列表 */
   const [feeds, setFeeds] = useState<Record<string, Note[]>>({})
   const [loading, setLoading] = useState(false)
-  /** 接口不可用（纯静态部署 / 被风控）时不再反复重试 */
+  const loadingRef = useRef(false)
+  /** 接口不可用时标记 */
   const [dead, setDead] = useState<Record<string, boolean>>({})
   const [collected, setCollected] = useState<Record<string, boolean>>({})
   const [openNote, setOpenNote] = useState<Note | null>(null)
-  const [visible, setVisible] = useState(PAGE_SIZE)
   const abortRef = useRef<AbortController | null>(null)
-  /** 每个流已经「到底」的标记：上拉加载某次返回 0 条新内容就封顶 */
+  /** 每个流已经「到底」的标记 */
   const [bottom, setBottom] = useState<Record<string, boolean>>({})
-  /** feeds 的镜像 ref，load 里用来算「这次新增了 N 条」（避免闭包拿到旧 state） */
+  /** feeds 的镜像 ref */
   const feedsRef = useRef<Record<string, Note[]>>({})
 
-  const activeNotes: Note[] = feeds[channel] || []
-  const list = activeNotes.slice(0, visible)
-  const hasMoreLocal = visible < activeNotes.length
-  const hasMore = hasMoreLocal || (!dead[channel] && !bottom[channel])
+  const list: Note[] = feeds[channel] || []
+  const hasMore = !dead[channel] && !bottom[channel]
 
   /**
-   * 抓一次数据。
-   * @param mode refresh=插到最前（下拉刷新/切频道）；more=追加到末尾（上拉加载）
+   * 抓一次数据（真实的 Ajax GET 请求）。
+   * @param mode refresh=重新加载第 1 页；more=上拉加载下一页追加到末尾
    * @param silent 不弹 Toast
    */
   const load = useCallback(
     async (ch: string, silent = false, mode: 'refresh' | 'more' = 'refresh') => {
-      abortRef.current?.abort()
+      if (loadingRef.current && mode === 'more') return 0
+      loadingRef.current = true
+      setLoading(true)
       const ac = new AbortController()
       abortRef.current = ac
-      setLoading(true)
       try {
         const r = await fetchFeed(ch, { signal: ac.signal, more: mode === 'more' })
         if (r.notes.length) {
-          const cur = feedsRef.current[ch] || []
-          const next = mode === 'more' ? mergeNotes(cur, r.notes) : mergeNotes(r.notes, cur)
+          const cur = mode === 'more' ? (feedsRef.current[ch] || []) : []
+          const next = mode === 'more' ? mergeNotes(cur, r.notes) : r.notes
           const added = next.length - cur.length
           feedsRef.current[ch] = next.slice(0, CAP)
           setFeeds((prev) => ({ ...prev, [ch]: next.slice(0, CAP) }))
           // 重新有数据了，撤销「到底」标记
           setBottom((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
           setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
-          if (added > 0) {
-            if (!silent) {
-              Toast.show({
-                content: mode === 'more' ? `又加载了 ${added} 条` : `已刷新 ${added} 条`,
-                duration: 1.5,
-              })
-            }
-            return added
+          if (added > 0 && !silent) {
+            Toast.show({
+              content: mode === 'more' ? `已加载 ${added} 条新笔记` : `已刷新 ${added} 条笔记`,
+              duration: 1.5,
+            })
           }
-          // 抓到了但全是重复的（极少见）→ 当作到底
-          if (mode === 'more') setBottom((prev) => ({ ...prev, [ch]: true }))
-          if (!silent) Toast.show({ content: '暂时没有更多了', duration: 1.5 })
-          return 0
+          return added
         }
-        setDead((prev) => (prev[ch] ? { ...prev, [ch]: false } : prev))
+        if (mode === 'more') setBottom((prev) => ({ ...prev, [ch]: true }))
         if (!silent) Toast.show({ content: '暂时没有更多了', duration: 1.5 })
         return 0
       } catch (e) {
         if ((e as Error).name === 'AbortError') return 0
         setDead((prev) => ({ ...prev, [ch]: true }))
-        if (!silent) Toast.show({ content: `抓取失败：${(e as Error).message}`, duration: 2.4 })
+        if (!silent) Toast.show({ content: `加载失败：${(e as Error).message}`, duration: 2.4 })
         return 0
       } finally {
+        loadingRef.current = false
         setLoading(false)
       }
     },
     []
   )
 
-  // 分类实时拉（不是写死的）
+  // 分类实时拉取
   useEffect(() => {
     const ac = new AbortController()
     fetchChannels(ac.signal)
@@ -111,14 +105,13 @@ export default function Explore() {
         if (names.length) setChannels([RECOMMEND, ...names])
       })
       .catch(() => {
-        /* 拉不到就只有「推荐」，下面会有提示 */
+        /* 拉不到就只有「推荐」 */
       })
     return () => ac.abort()
   }, [])
 
-  // 首屏 + 每次切频道都重新请求
+  // 首屏 + 每次切频道发起 Ajax 请求
   useEffect(() => {
-    setVisible(PAGE_SIZE)
     document.querySelector(SCROLLER)?.scrollTo({ top: 0 })
     void load(channel, true, 'refresh')
   }, [channel, load])
@@ -127,31 +120,52 @@ export default function Explore() {
 
   /** 下拉刷新 */
   const { distance, pulling, refreshing } = usePullToRefresh(SCROLLER, async () => {
-    setVisible(PAGE_SIZE)
-    const n = await load(channel, true, 'refresh')
+    const n = await load(channel, false, 'refresh')
     if (n) Toast.show({ content: `已刷新 ${n} 条最新笔记`, duration: 1.6 })
   })
 
-  /** 上拉加载：先把本地没展示完的翻出来，翻完了再从接口续一页 */
-  const loadMore = () =>
-    new Promise<void>((resolve) => {
-      if (hasMoreLocal) {
-        setTimeout(() => {
-          setVisible((v) => v + PAGE_SIZE)
-          resolve()
-        }, 400)
-        return
-      }
-      if (dead[channel] || loading || bottom[channel]) {
+  /** 上拉加载：每一次都发起真实的 Ajax / Fetch 请求并追加数据 */
+  const loadMore = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      if (loadingRef.current || dead[channel] || bottom[channel]) {
         resolve()
         return
       }
-      void load(channel, true, 'more').then((n) => {
-        // 只有真的多出来新笔记才把可见条数往下推一页；否则（已到底）就停在「已经到底了」
-        if (n > 0) setVisible((v) => v + PAGE_SIZE)
+      void load(channel, false, 'more').then(() => {
         resolve()
       })
     })
+  }, [channel, dead, bottom, load])
+
+  /** 滚动触底检测双保险（同时监听 window 和 #page-body，确保任何视口/设备下均能触底加载） */
+  useEffect(() => {
+    const el = document.getElementById(SCROLLER_ID)
+    const checkAndLoad = () => {
+      if (loadingRef.current || bottom[channel] || dead[channel]) return
+
+      let distanceToBottom = 9999
+      if (el && el.scrollHeight > el.clientHeight) {
+        distanceToBottom = Math.min(distanceToBottom, el.scrollHeight - el.clientHeight - el.scrollTop)
+      }
+      const winScrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0
+      const winHeight = window.innerHeight || document.documentElement.clientHeight || 0
+      const winScrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0
+      if (winScrollHeight > winHeight) {
+        distanceToBottom = Math.min(distanceToBottom, winScrollHeight - winHeight - winScrollTop)
+      }
+
+      if (distanceToBottom <= 260) {
+        void load(channel, false, 'more')
+      }
+    }
+
+    el?.addEventListener('scroll', checkAndLoad, { passive: true })
+    window.addEventListener('scroll', checkAndLoad, { passive: true })
+    return () => {
+      el?.removeEventListener('scroll', checkAndLoad)
+      window.removeEventListener('scroll', checkAndLoad)
+    }
+  }, [channel, bottom, dead, load])
 
   const toggleCollect = (note: Note) => {
     const next = !collected[note.id]
@@ -201,14 +215,34 @@ export default function Explore() {
           <Empty description="这个频道暂时拿不到数据，点右上角刷新试试" />
         </div>
       ) : (
-        <Waterfall notes={list} onOpen={setOpenNote} />
+        <>
+          <Waterfall notes={list} onOpen={setOpenNote} />
+          <div
+            className="loadmore-trigger"
+            onClick={() => {
+              if (!loadingRef.current && hasMore) {
+                void load(channel, false, 'more')
+              }
+            }}
+            style={{
+              textAlign: 'center',
+              padding: '16px 0 28px',
+              color: '#999',
+              fontSize: '13px',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            {loading ? '正在请求最新笔记…' : hasMore ? '上拉或点击加载更多' : '— 已经到底了 —'}
+          </div>
+        </>
       )}
 
       <InfiniteLoading
         hasMore={hasMore}
-        threshold={120}
+        threshold={180}
         target={SCROLLER_ID}
-        loadingText="正在加载…"
+        loadingText="正在加载更多…"
         loadMoreText="已经到底了"
         onLoadMore={loadMore}
       />
