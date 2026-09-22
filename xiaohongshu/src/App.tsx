@@ -2,7 +2,7 @@ import Explore from './components/Explore'
 import UserPage from './components/UserPage'
 import NoteDetail from './components/NoteDetail'
 import { ToastHost } from './components/Toast'
-import { useRoute, navigate, openNoteRoute, openUserProfileRoute } from './router'
+import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl } from './router'
 
 /**
  * 路由驱动的应用顶级入口：
@@ -21,7 +21,11 @@ export default function App() {
       <div
         className="page-body"
         id="page-body"
-        style={{ display: route.name === 'home' ? 'block' : 'none' }}
+        style={{
+          display: 'block',
+          visibility: route.name === 'home' ? 'visible' : 'hidden',
+          pointerEvents: route.name === 'home' ? 'auto' : 'none',
+        }}
       >
         <Explore />
       </div>
@@ -34,8 +38,11 @@ export default function App() {
             if (window.history.length > 1) {
               window.history.back()
             } else {
-              navigate('/')
+              navigate(getExploreUrl())
             }
+          }}
+          onGoHome={() => {
+            navigate(getExploreUrl())
           }}
           onOpenNote={(note) => {
             openNoteRoute(note.id)
@@ -51,8 +58,11 @@ export default function App() {
             if (window.history.length > 1) {
               window.history.back()
             } else {
-              navigate('/')
+              navigate(getExploreUrl())
             }
+          }}
+          onGoHome={() => {
+            navigate(getExploreUrl())
           }}
           onOpenUser={(author) => {
             openUserProfileRoute(author)

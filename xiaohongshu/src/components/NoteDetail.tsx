@@ -4,12 +4,13 @@ import {
   ArrowRight,
   Comment,
   Heart,
+  Home,
   Share,
   Star,
 } from '@nutui/icons-react'
 import type { CommentItem, Note, NoteDetailData, Author } from '../data'
 import { fetchNoteComments, fetchNoteDetail } from '../data/api'
-import { openUserProfileRoute } from '../router'
+import { openUserProfileRoute, navigate, getExploreUrl } from '../router'
 import { Toast } from './Toast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
@@ -19,6 +20,7 @@ interface Props {
   collected?: boolean
   onCollect?: (note: Note) => void
   onClose: () => void
+  onGoHome?: () => void
   onOpenUser?: (author: Partial<Author>, note?: Note) => void
 }
 
@@ -37,7 +39,14 @@ function parseCount(raw: string | undefined, delta: number): string {
  * 4. 真实互动数据：点赞数、收藏、分享
  * 5. 真实评论区（comments）：只展示、不可点击、不可回复
  */
-export default function NoteDetail({ noteId, note = null, collected = false, onClose, onOpenUser }: Props) {
+export default function NoteDetail({
+  noteId,
+  note = null,
+  collected = false,
+  onClose,
+  onGoHome,
+  onOpenUser,
+}: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
@@ -68,6 +77,19 @@ export default function NoteDetail({ noteId, note = null, collected = false, onC
       setIsClosing(false)
     }, 220)
   }, [isClosing, onClose])
+
+  const handleGoHome = useCallback(() => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(() => {
+      if (onGoHome) {
+        onGoHome()
+      } else {
+        navigate(getExploreUrl())
+      }
+      setIsClosing(false)
+    }, 200)
+  }, [isClosing, onGoHome])
 
   // 支持键盘 Esc 退出
   useEffect(() => {
@@ -217,6 +239,7 @@ export default function NoteDetail({ noteId, note = null, collected = false, onC
               e.stopPropagation()
               handleClose()
             }}
+            title="返回上一页"
             aria-label="返回上一页"
           >
             <ArrowLeft width={20} height={20} />
@@ -256,29 +279,44 @@ export default function NoteDetail({ noteId, note = null, collected = false, onC
             )}
           </div>
 
-          <button
-            type="button"
-            className="detail-nav-btn detail-nav-close"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleClose()
-            }}
-            aria-label="关闭详情"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="detail-nav-actions-right">
+            <button
+              type="button"
+              className="detail-nav-btn detail-nav-home"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleGoHome()
+              }}
+              title="返回首页"
+              aria-label="返回首页"
             >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+              <Home width={18} height={18} />
+            </button>
+            <button
+              type="button"
+              className="detail-nav-btn detail-nav-close"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleGoHome()
+              }}
+              title="关闭并返回首页"
+              aria-label="关闭并返回首页"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div

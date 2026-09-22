@@ -485,6 +485,13 @@
   pointer-events: auto;
 }
 
+.detail-nav-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
 .detail-nav-btn {
   pointer-events: auto;
   width: 36px;

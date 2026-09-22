@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Loading, Share } from '@nutui/icons-react'
+import { ArrowLeft, Home, Loading, Share } from '@nutui/icons-react'
 import type { Note, UserProfileData } from '../data'
 import { fetchUserProfileApi } from '../data/api'
 import { Toast } from './Toast'
 import NoteCard from './NoteCard'
+import { navigate, getExploreUrl } from '../router'
 
 interface Props {
   userId: string
   knownNotes?: Note[]
   onBack: () => void
+  onGoHome?: () => void
   onOpenNote: (note: Note) => void
 }
 
-export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }: Props) {
+export default function UserPage({ userId, knownNotes = [], onBack, onGoHome, onOpenNote }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [avatarBroken, setAvatarBroken] = useState(false)
@@ -46,6 +48,18 @@ export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }
     }, 240)
   }
 
+  const handleGoHome = () => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(() => {
+      if (onGoHome) {
+        onGoHome()
+      } else {
+        navigate(getExploreUrl())
+      }
+    }, 220)
+  }
+
   const handleCopyRedId = () => {
     if (profile?.redId && navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(profile.redId).catch(() => {})
@@ -65,7 +79,8 @@ export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }
           type="button"
           className="user-page-nav-btn user-page-back-btn"
           onClick={handleBack}
-          aria-label="返回"
+          title="返回上一页"
+          aria-label="返回上一页"
         >
           <ArrowLeft width={18} height={18} />
         </button>
@@ -87,6 +102,15 @@ export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }
         </div>
 
         <div className="user-page-nav-actions">
+          <button
+            type="button"
+            className="user-page-nav-btn user-page-home-btn"
+            onClick={handleGoHome}
+            title="返回首页"
+            aria-label="返回首页"
+          >
+            <Home width={17} height={17} />
+          </button>
           {profile?.userUrl && (
             <a
               className="user-page-nav-btn"

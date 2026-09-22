@@ -4,7 +4,7 @@ import type { Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
-import { openUserProfileRoute, openNoteRoute } from '../router'
+import { openUserProfileRoute, openNoteRoute, setExploreChannel } from '../router'
 import ChannelChips from './ChannelChips'
 import { Toast } from './Toast'
 import Waterfall from './Waterfall'
@@ -43,6 +43,7 @@ function getInitialChannel(): string {
 
 /** 同步当前频道到浏览器地址栏（写入 history，支持刷新与后退前进） */
 function syncUrlChannel(ch: string) {
+  setExploreChannel(ch)
   if (typeof window === 'undefined') return
   try {
     const url = new URL(window.location.href)
@@ -86,6 +87,32 @@ export default function Explore() {
 
   const list: Note[] = feeds[channel] || []
   const hasMore = !dead[channel] && !bottom[channel]
+
+  /** 记录每个频道的滚动条高度，切回或返回时精准复原 */
+  const channelScrollRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    setExploreChannel(channel)
+  }, [channel])
+
+  const switchChannel = useCallback(
+    (nextCh: string) => {
+      if (nextCh === channel) return
+      const scroller = document.querySelector(SCROLLER)
+      if (scroller) {
+        channelScrollRef.current[channel] = scroller.scrollTop
+      }
+      setChannel(nextCh)
+      syncUrlChannel(nextCh)
+      requestAnimationFrame(() => {
+        const el = document.querySelector(SCROLLER)
+        if (el) {
+          el.scrollTop = channelScrollRef.current[nextCh] ?? 0
+        }
+      })
+    },
+    [channel]
+  )
 
   /**
    * 抓一次数据（真实的 Ajax GET 请求）。
@@ -156,6 +183,15 @@ export default function Explore() {
       const ch = getInitialChannel()
       setChannel((prev) => {
         if (prev === ch) {
+          const target = channelScrollRef.current[ch]
+          if (typeof target === 'number') {
+            requestAnimationFrame(() => {
+              const el = document.querySelector(SCROLLER)
+              if (el && Math.abs(el.scrollTop - target) > 5) {
+                el.scrollTop = target
+              }
+            })
+          }
           // 若从直接在地址栏打开的个人页返回探索页且尚未加载过数据，补一次初次加载
           if (!feedsRef.current[ch]?.length) {
             void load(ch, true, 'refresh')
@@ -167,9 +203,11 @@ export default function Explore() {
     }
     window.addEventListener('popstate', handleUrlChange)
     window.addEventListener('hashchange', handleUrlChange)
+    window.addEventListener('app:routechange', handleUrlChange)
     return () => {
       window.removeEventListener('popstate', handleUrlChange)
       window.removeEventListener('hashchange', handleUrlChange)
+      window.removeEventListener('app:routechange', handleUrlChange)
     }
   }, [load])
 
@@ -280,13 +318,11 @@ export default function Explore() {
         if (dx < 0 && idx < channels.length - 1) {
           // 向左滑：切换到下一个频道
           const nextCh = channels[idx + 1]
-          setChannel(nextCh)
-          syncUrlChannel(nextCh)
+          switchChannel(nextCh)
         } else if (dx > 0 && idx > 0) {
           // 向右滑：切换到上一个频道
           const prevCh = channels[idx - 1]
-          setChannel(prevCh)
-          syncUrlChannel(prevCh)
+          switchChannel(prevCh)
         }
       }
     }
@@ -316,10 +352,7 @@ export default function Explore() {
           channels={channels}
           value={channel}
           onChange={(c) => {
-            if (c !== channel) {
-              setChannel(c)
-              syncUrlChannel(c)
-            }
+            switchChannel(c)
           }}
         />
       </div>
@@ -346,8 +379,20 @@ export default function Explore() {
             <div key={channel} className="feed-transition-wrap">
               <Waterfall
                 notes={list}
-                onOpen={(n) => openNoteRoute(n.id)}
-                onOpenUser={(author) => openUserProfileRoute(author)}
+                onOpen={(n) => {
+                  const scroller = document.querySelector(SCROLLER)
+                  if (scroller) {
+                    channelScrollRef.current[channel] = scroller.scrollTop
+                  }
+                  openNoteRoute(n.id)
+                }}
+                onOpenUser={(author) => {
+                  const scroller = document.querySelector(SCROLLER)
+                  if (scroller) {
+                    channelScrollRef.current[channel] = scroller.scrollTop
+                  }
+                  openUserProfileRoute(author)
+                }}
               />
             </div>
             <div

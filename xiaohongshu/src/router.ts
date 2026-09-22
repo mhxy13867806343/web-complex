@@ -118,6 +118,11 @@ export function parseRoute(rawUrl?: string): RouteInfo {
       }
     }
 
+    const ch = query.channel || query.tab
+    if (ch) {
+      setExploreChannel(decodeURIComponent(ch).trim())
+    }
+
     return {
       path: pathname,
       name: 'home',
@@ -127,6 +132,45 @@ export function parseRoute(rawUrl?: string): RouteInfo {
   } catch {
     return { path: '/', name: 'home', query: {} }
   }
+}
+
+const STORAGE_CHANNEL_KEY = 'xhs_last_active_channel'
+
+function getSavedActiveChannel(): string {
+  if (typeof window === 'undefined') return '推荐'
+  try {
+    const saved = sessionStorage.getItem(STORAGE_CHANNEL_KEY)
+    if (saved && saved.trim()) return saved.trim()
+  } catch {
+    /* ignore */
+  }
+  return '推荐'
+}
+
+let lastActiveChannel = getSavedActiveChannel()
+
+export function setExploreChannel(ch: string) {
+  if (ch && ch.trim()) {
+    lastActiveChannel = ch.trim()
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(STORAGE_CHANNEL_KEY, lastActiveChannel)
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export function getExploreChannel(): string {
+  return lastActiveChannel
+}
+
+export function getExploreUrl(): string {
+  const ch = getExploreChannel()
+  return ch && ch !== '推荐'
+    ? `/?channel=${encodeURIComponent(ch)}`
+    : '/'
 }
 
 const ROUTE_EVENT = 'app:routechange'
