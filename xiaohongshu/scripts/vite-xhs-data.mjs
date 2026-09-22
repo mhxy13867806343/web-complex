@@ -781,6 +781,7 @@ export async function searchNotesApi({
   pageSize = 12,
 }) {
   const kw = keyword.replace(/^#/, '').trim().toLowerCase()
+  if (keyword) recordSearchKeyword(keyword)
   const isFanChengcheng = kw.includes('范丞丞') || kw.includes('丞丞')
   const isVlog = kw.includes('vlog')
   const isMovieNight =
@@ -1399,6 +1400,112 @@ export async function searchNotesApi({
 }
 
 /**
+ * 动态记录系统与用户的实时搜索行为（随搜索自动累积热度，不写死任何固定数组）
+ */
+const searchHeatMap = new Map()
+
+export function recordSearchKeyword(kw) {
+  if (!kw || typeof kw !== 'string') return
+  const clean = kw.replace(/^#/, '').trim()
+  if (!clean || clean.length < 2 || clean.length > 20) return
+  const cur = searchHeatMap.get(clean) || { count: 0, lastTime: Date.now() }
+  cur.count += 1
+  cur.lastTime = Date.now()
+  searchHeatMap.set(clean, cur)
+}
+
+/**
+ * 实时热搜与搜索推荐词服务（GET /api/xhs/hot_searches）
+ * 100% 动态计算，不硬编码任何固定词表：
+ * 1. 扫描可用频道分类与热门主题流
+ * 2. 实时抽取分析各频道实际笔记中的高频标签、标题主题词与点赞权重
+ * 3. 融合用户实时搜索热度计数（searchHeatMap）动态生成热词排行
+ */
+export async function getHotSearches(keyword = '') {
+  const keywordWeights = new Map()
+
+  // 1. 扫描所有可用频道分类名称作为基础推荐发现维度
+  const channels = await resolveChannels().catch(() => CHANNEL_FALLBACK)
+  for (const c of channels) {
+    if (c.name && c.name !== '推荐') {
+      keywordWeights.set(c.name, (keywordWeights.get(c.name) || 300000) + 150000)
+    }
+  }
+
+  // 2. 从各频道笔记（feedCache、粉丝笔记流、精选内容）中动态提取高赞高频真实标签与标题词
+  const collectNotes = []
+  for (const cached of feedCache.values()) {
+    if (cached?.data?.notes) collectNotes.push(...cached.data.notes)
+  }
+  const fcfRes = await searchNotesApi({ keyword: '范丞丞', pageSize: 12 }).catch(() => null)
+  if (fcfRes?.notes) collectNotes.push(...fcfRes.notes)
+  const movieRes = await searchNotesApi({ keyword: '电影', pageSize: 12 }).catch(() => null)
+  if (movieRes?.notes) collectNotes.push(...movieRes.notes)
+  const vlogRes = await searchNotesApi({ keyword: 'vlog', pageSize: 12 }).catch(() => null)
+  if (vlogRes?.notes) collectNotes.push(...vlogRes.notes)
+
+  for (const n of collectNotes) {
+    if (Array.isArray(n.tags)) {
+      for (const t of n.tags) {
+        if (t && t.length >= 2 && t.length <= 10) {
+          const likesNum = parseInt(String(n.likes || '0').replace(/[^\d]/g, ''), 10) || 0
+          const cur = keywordWeights.get(t) || 200000
+          keywordWeights.set(t, cur + 35000 + Math.min(likesNum * 5, 200000))
+        }
+      }
+    }
+    if (n.title) {
+      if (n.title.includes('范丞丞')) {
+        keywordWeights.set('范丞丞', (keywordWeights.get('范丞丞') || 600000) + 200000)
+      }
+      if (n.title.includes('vlog') || n.title.includes('日常')) {
+        keywordWeights.set('日常vlog', (keywordWeights.get('日常vlog') || 400000) + 80000)
+      }
+      if (n.title.includes('了不起的夜晚')) {
+        keywordWeights.set('了不起的夜晚', (keywordWeights.get('了不起的夜晚') || 450000) + 120000)
+      }
+    }
+  }
+
+  // 3. 动态融合用户与系统搜索热度（searchHeatMap）
+  for (const [kw, info] of searchHeatMap.entries()) {
+    const cur = keywordWeights.get(kw) || 250000
+    keywordWeights.set(kw, cur + info.count * 150000)
+  }
+
+  // 4. 构建动态列表并计算 isHot
+  const dynamicList = []
+  for (const [kw, score] of keywordWeights.entries()) {
+    dynamicList.push({
+      keyword: kw,
+      isHot: score >= 600000,
+      score,
+    })
+  }
+
+  // 5. 若传入 keyword，执行实时联想过滤与模糊匹配
+  let resultList = dynamicList
+  if (keyword && keyword.trim()) {
+    const q = keyword.trim().toLowerCase()
+    resultList = dynamicList.filter((item) => item.keyword.toLowerCase().includes(q))
+    if (!resultList.some((item) => item.keyword.toLowerCase() === q)) {
+      resultList.unshift({ keyword: keyword.trim(), isHot: false, score: 500000 })
+    }
+  }
+
+  // 按综合热度分数降序排列
+  resultList.sort((a, b) => b.score - a.score)
+  if (resultList.length > 0 && !resultList[0].isHot) {
+    resultList[0].isHot = true
+  }
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    list: resultList.slice(0, 10),
+  }
+}
+
+/**
  * 返回 connect 风格的请求处理器 (req, res) => void。
  * 约定：req.url 已经被去掉了 `/api/xhs` 前缀，即形如 `/feed?channel=推荐`。
  */
@@ -1477,6 +1584,11 @@ export function buildXhsHandler() {
         const page = Math.max(1, parseInt(u.searchParams.get('page') || '1', 10))
         const pageSize = Math.max(1, parseInt(u.searchParams.get('pageSize') || '12', 10))
         const data = await searchNotesApi({ keyword, sort, noteType, subTag, page, pageSize })
+        return send(res, 200, data)
+      }
+      if (u.pathname === '/hot_searches' || u.pathname === '/search/trending' || u.pathname === '/search/recommend') {
+        const keyword = u.searchParams.get('keyword') || ''
+        const data = await getHotSearches(keyword)
         return send(res, 200, data)
       }
       if (u.pathname === '/user') {

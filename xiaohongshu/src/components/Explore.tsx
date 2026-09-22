@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BackTop, Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
 import type { Note } from '../data'
-import { fetchChannels, fetchFeed } from '../data/api'
+import { fetchChannels, fetchFeed, fetchHotSearchesApi, type HotSearchItem } from '../data/api'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute } from '../router'
@@ -10,8 +10,7 @@ import { Toast } from './Toast'
 import Waterfall from './Waterfall'
 
 const RECOMMEND = '推荐'
-/** 热门搜索推荐词汇 */
-const HOT_SEARCHES = ['🔥 范丞丞', '穿搭', '美食', '日常vlog', '秋季穿搭', '减脂餐', '摄影神图', '护肤']
+
 /** 给 document.querySelector 用（带 #），下拉刷新 / 切频道滚顶都靠它 */
 const SCROLLER = '#page-body'
 /** 给 NutUI InfiniteLoading 的 target 用 —— 组件内部是 document.getElementById(target)，所以这里只能传 id（不带 #） */
@@ -90,10 +89,26 @@ export default function Explore() {
   const list: Note[] = feeds[channel] || []
   const hasMore = !dead[channel] && !bottom[channel]
 
-  /** 顶部搜索状态 */
+  /** 顶部搜索状态与接口动态热搜列表（通过 /api/xhs/hot_searches 实时获取） */
   const [searchKeyword, setSearchKeyword] = useState('')
   const [showSuggest, setShowSuggest] = useState(false)
+  const [hotSearches, setHotSearches] = useState<HotSearchItem[]>([])
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
+
+  // 动态请求热搜词接口
+  useEffect(() => {
+    const ac = new AbortController()
+    fetchHotSearchesApi('', ac.signal)
+      .then((res) => {
+        if (res && Array.isArray(res.list) && res.list.length > 0) {
+          setHotSearches(res.list)
+        }
+      })
+      .catch(() => {
+        /* handled */
+      })
+    return () => ac.abort()
+  }, [])
 
   useEffect(() => {
     const handleDocClick = (e: MouseEvent) => {
@@ -106,7 +121,8 @@ export default function Explore() {
   }, [])
 
   const handleSearch = (kw?: string) => {
-    const q = (typeof kw === 'string' ? kw : searchKeyword).trim() || '范丞丞'
+    const defaultTerm = hotSearches[0]?.keyword || '范丞丞'
+    const q = (typeof kw === 'string' ? kw : searchKeyword).trim() || defaultTerm
     setShowSuggest(false)
     openSearchResultRoute(q)
   }
@@ -399,7 +415,11 @@ export default function Explore() {
               type="text"
               className="explore-search-input"
               value={searchKeyword}
-              placeholder="搜索小红书笔记（如：范丞丞）"
+              placeholder={
+                hotSearches[0]
+                  ? `搜索小红书笔记（如：${hotSearches[0].keyword}）`
+                  : '搜索小红书笔记'
+              }
               onFocus={() => setShowSuggest(true)}
               onChange={(e) => setSearchKeyword(e.target.value)}
               onKeyDown={(e) => {
@@ -429,18 +449,18 @@ export default function Explore() {
             </button>
           </div>
 
-          {showSuggest && (
+          {showSuggest && hotSearches.length > 0 && (
             <div className="explore-search-suggestions">
               <div className="explore-suggest-title">热门搜索</div>
               <div className="explore-suggest-tags">
-                {HOT_SEARCHES.map((tag) => (
+                {hotSearches.map((item) => (
                   <button
-                    key={tag}
+                    key={item.keyword}
                     type="button"
-                    className={`explore-suggest-tag ${tag.includes('🔥') ? 'hot' : ''}`}
-                    onClick={() => handleTagClick(tag)}
+                    className={`explore-suggest-tag ${item.isHot ? 'hot' : ''}`}
+                    onClick={() => handleTagClick(item.keyword)}
                   >
-                    {tag}
+                    {item.isHot ? `🔥 ${item.keyword}` : item.keyword}
                   </button>
                 ))}
               </div>

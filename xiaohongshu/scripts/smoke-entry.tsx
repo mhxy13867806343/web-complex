@@ -61,6 +61,20 @@ function installFetchStub() {
         }),
       }
     }
+    if (u.pathname === '/api/xhs/hot_searches' || u.pathname.includes('hot_searches')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          fetchedAt: new Date().toISOString(),
+          list: [
+            { keyword: '范丞丞', isHot: true, score: 998000 },
+            { keyword: '穿搭', isHot: false, score: 885000 },
+            { keyword: '美食', isHot: false, score: 796000 },
+          ],
+        }),
+      }
+    }
     return { ok: false, status: 404, json: async () => ({}) }
   }
   // 包一层：兼容组件里 fetch(path, { signal, headers }) 的调用方式

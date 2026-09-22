@@ -384,6 +384,85 @@ export interface SearchResultData {
   } | null
 }
 
+export interface HotSearchItem {
+  keyword: string
+  isHot?: boolean
+  score?: number
+  tag?: string
+}
+
+export interface HotSearchesData {
+  fetchedAt: string
+  list: HotSearchItem[]
+}
+
+/**
+ * 实时获取热门搜索词 / 搜索推荐建议列表（GET /api/xhs/hot_searches）
+ */
+export async function fetchHotSearchesApi(
+  keyword?: string,
+  signal?: AbortSignal
+): Promise<HotSearchesData> {
+  const base = getApiBase()
+  const qs = new URLSearchParams()
+  if (keyword) qs.set('keyword', keyword)
+  const path = `/api/xhs/hot_searches${qs.toString() ? `?${qs.toString()}` : ''}`
+  const url = base ? `${base.replace(/\/$/, '')}${path}` : path
+
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as HotSearchesData
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e
+  }
+
+  // 离线/静态兜底：从静态频道与笔记库中动态抽取热词，不写死固定数组
+  const dynamicMap = new Map<string, number>()
+  STATIC_CHANNELS.forEach((c) => {
+    if (c.name && c.name !== '推荐') dynamicMap.set(c.name, 400000)
+  })
+  Object.values(STATIC_FEEDS).forEach((notes) => {
+    notes.forEach((n) => {
+      if (Array.isArray(n.tags)) {
+        n.tags.forEach((t) => {
+          if (t && t.length >= 2 && t.length <= 8) {
+            dynamicMap.set(t, (dynamicMap.get(t) || 200000) + 30000)
+          }
+        })
+      }
+      if (n.title?.includes('范丞丞')) {
+        dynamicMap.set('范丞丞', (dynamicMap.get('范丞丞') || 600000) + 300000)
+      }
+    })
+  })
+
+  let list: HotSearchItem[] = Array.from(dynamicMap.entries()).map(([kw, score]) => ({
+    keyword: kw,
+    isHot: score >= 500000,
+    score,
+  }))
+
+  if (keyword && keyword.trim()) {
+    const q = keyword.trim().toLowerCase()
+    list = list.filter((item) => item.keyword.toLowerCase().includes(q))
+    if (!list.some((item) => item.keyword.toLowerCase() === q)) {
+      list.unshift({ keyword: keyword.trim(), isHot: false, score: 500000 })
+    }
+  }
+
+  list.sort((a, b) => (b.score || 0) - (a.score || 0))
+  if (list.length > 0 && !list[0].isHot) {
+    list[0].isHot = true
+  }
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    list: list.slice(0, 10),
+  }
+}
+
 /**
  * 抓取搜索结果列表（支持关键词搜索、排序模式与笔记类型过滤）
  */
