@@ -28,14 +28,16 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: 'xiaohongshu/package.json'
 
       - name: Install dependencies & Build xiaohongshu
+        env:
+          NODE_ENV: development
         run: |
           cd xiaohongshu
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --include=dev
           npm run build
 
       - name: Prepare Pages Artifact

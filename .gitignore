@@ -6,3 +6,5 @@ www/
 .smoke/
 **/.xhs-cookie
 *.genie
+.workbuddy/applications.yaml
+.workbuddy/memory/automations/

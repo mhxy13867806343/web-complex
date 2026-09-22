@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>扫雷 · WorkBuddy PC</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<style>
+  .main { display:flex; flex-direction:column; align-items:center; gap:12px;
+    max-width:1000px; margin:0 auto; padding:16px 14px 36px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .pill { background:var(--bg-1); border:1px solid var(--line); border-radius:10px; padding:6px 14px; font-size:13.5px; }
+  .pill b { font-variant-numeric:tabular-nums; color:var(--acc); }
+  .diff button.on { border-color:var(--acc); color:var(--acc); }
+  .stage { position:relative; }
+  canvas { display:block; border-radius:12px; background:#141927; }
+  .overlay { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; background:rgba(8,12,22,.82); border-radius:12px; backdrop-filter:blur(4px); text-align:center; padding:20px; }
+  .overlay.show { display:flex; }
+  .overlay h2 { margin:0; font-size:26px; }
+  .overlay p { margin:0; color:var(--txt-1); font-size:13px; }
+  .tip { font-size:12.5px; color:var(--txt-1); }
+  kbd { background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
+    padding:1px 6px; font-size:11px; font-family:inherit; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="btn sm ghost" href="../index.html">← 返回</a>
+  <span class="title">扫雷</span>
+  <span class="spacer"></span>
+  <button class="btn sm ghost" id="btnSound">🔊</button>
+</div>
+
+<div class="main">
+  <div class="bar diff">
+    <button class="btn sm ghost on" data-d="0">初级 9×9 · 10雷</button>
+    <button class="btn sm ghost" data-d="1">中级 16×16 · 40雷</button>
+    <button class="btn sm ghost" data-d="2">高级 30×16 · 99雷</button>
+  </div>
+  <div class="bar">
+    <div class="pill">💣 剩余 <b id="left">10</b></div>
+    <div class="pill">⏱ <b id="time">0</b>s</div>
+    <button class="btn sm primary" id="btnNew">🙂 新开局</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="overlay" id="over">
+      <h2 id="overT">💥 踩雷了</h2>
+      <p id="overP"></p>
+      <button class="btn primary" id="btnAgain">再来一局</button>
+    </div>
+  </div>
+
+  <div class="tip">左键开格 · 右键插旗 · 在已开数字格上双击（或左右键同按）快速开周围 8 格 · 首次点击必安全</div>
+</div>
+
+<script src="../../shared/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  function el(id) { return document.getElementById(id); }
+
+  var DIFFS = [
+    { cols: 9,  rows: 9,  mines: 10, cell: 40 },
+    { cols: 16, rows: 16, mines: 40, cell: 34 },
+    { cols: 30, rows: 16, mines: 99, cell: 30 }
+  ];
+  var NUM_COLS = ['', '#60a5fa', '#4ade80', '#f87171', '#a78bfa', '#fb923c', '#22d3ee', '#e5e9f2', '#94a3b8'];
+
+  var D, curDiff, board, started, over, win, flags, opened, t0, timerId, elapsed, mouse;
+
+  function newGame(di) {
+    if (di != null) curDiff = di;
+    D = DIFFS[curDiff];
+    cv.width = D.cols * D.cell; cv.height = D.rows * D.cell;
+    board = [];
+    for (var r = 0; r < D.rows; r++) {
+      board.push([]);
+      for (var c = 0; c < D.cols; c++) board[r].push({ mine: false, open: false, flag: false, n: 0, boom: false });
+    }
+    started = false; over = false; win = false; flags = 0; opened = 0; elapsed = 0;
+    clearInterval(timerId);
+    el('time').textContent = 0;
+    el('left').textContent = D.mines;
+    el('over').classList.remove('show');
+    el('btnNew').textContent = '🙂 新开局';
+    draw();
+  }
+
+  function plant(safeR, safeC) {
+    var placed = 0;
+    while (placed < D.mines) {
+      var r = (Math.random() * D.rows) | 0, c = (Math.random() * D.cols) | 0;
+      if (board[r][c].mine) continue;
+      if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue; // 首点周围安全
+      board[r][c].mine = true; placed++;
+    }
+    for (var r2 = 0; r2 < D.rows; r2++) for (var c2 = 0; c2 < D.cols; c2++) {
+      if (board[r2][c2].mine) continue;
+      var n = 0;
+      eachN(r2, c2, function (rr, cc) { if (board[rr][cc].mine) n++; });
+      board[r2][c2].n = n;
+    }
+  }
+
+  function eachN(r, c, fn) {
+    for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      var rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < D.rows && cc >= 0 && cc < D.cols) fn(rr, cc);
+    }
+  }
+
+  function startTimer() {
+    t0 = Date.now();
+    timerId = setInterval(function () {
+      elapsed = ((Date.now() - t0) / 1000) | 0;
+      el('time').textContent = elapsed;
+    }, 250);
+  }
+
+  function openCell(r, c) {
+    var cell = board[r][c];
+    if (cell.open || cell.flag || over) return;
+    if (!started) { started = true; plant(r, c); startTimer(); }
+    cell.open = true; opened++;
+    if (cell.mine) { cell.boom = true; lose(); return; }
+    WB.sfx.play(cell.n ? 'tap' : 'pop');
+    if (cell.n === 0) {
+      eachN(r, c, function (rr, cc) { if (!board[rr][cc].open && !board[rr][cc].mine) openCell(rr, cc); });
+    }
+    checkWin();
+  }
+
+  function toggleFlag(r, c) {
+    var cell = board[r][c];
+    if (cell.open || over) return;
+    cell.flag = !cell.flag;
+    flags += cell.flag ? 1 : -1;
+    el('left').textContent = D.mines - flags;
+    WB.sfx.play(cell.flag ? 'click' : 'undo');
+  }
+
+  function chord(r, c) {
+    var cell = board[r][c];
+    if (!cell.open || !cell.n || over) return;
+    var f = 0;
+    eachN(r, c, function (rr, cc) { if (board[rr][cc].flag) f++; });
+    if (f !== cell.n) { WB.sfx.play('error'); return; }
+    eachN(r, c, function (rr, cc) { if (!board[rr][cc].flag && !board[rr][cc].open) openCell(rr, cc); });
+  }
+
+  function checkWin() {
+    if (opened === D.rows * D.cols - D.mines) {
+      over = true; win = true;
+      clearInterval(timerId);
+      el('btnNew').textContent = '😎 新开局';
+      el('overT').textContent = '🎉 排雷成功！';
+      el('overP').textContent = '用时 ' + elapsed + ' 秒 · ' + ['初级', '中级', '高级'][curDiff];
+      el('over').classList.add('show');
+      WB.sfx.play('win');
+    }
+  }
+
+  function lose() {
+    over = true;
+    clearInterval(timerId);
+    for (var r = 0; r < D.rows; r++) for (var c = 0; c < D.cols; c++) {
+      if (board[r][c].mine && !board[r][c].flag) board[r][c].open = true;
+    }
+    el('btnNew').textContent = '😵 新开局';
+    el('overT').textContent = '💥 踩雷了';
+    el('overP').textContent = '坚持了 ' + elapsed + ' 秒 · 已开 ' + opened + ' 格';
+    el('over').classList.add('show');
+    WB.sfx.play('lose');
+    draw();
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    var cs = D.cell;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (var r = 0; r < D.rows; r++) {
+      for (var c = 0; c < D.cols; c++) {
+        var cell = board[r][c], x = c * cs, y = r * cs;
+        if (cell.open) {
+          ctx.fillStyle = cell.boom ? '#7f1d1d' : '#1a2030';
+          ctx.fillRect(x, y, cs, cs);
+          if (cell.mine) {
+            ctx.font = (cs * 0.55) + 'px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('💣', x + cs / 2, y + cs * 0.72);
+          } else if (cell.n) {
+            ctx.fillStyle = NUM_COLS[cell.n];
+            ctx.font = 'bold ' + (cs * 0.5) + 'px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(cell.n, x + cs / 2, y + cs * 0.7);
+          }
+        } else {
+          var hov = mouse && mouse.r === r && mouse.c === c && !over;
+          ctx.fillStyle = hov ? '#33405c' : '#252f47';
+          rr(x + 1, y + 1, cs - 2, cs - 2, 4); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,.07)';
+          ctx.fillRect(x + 2, y + 2, cs - 4, 3);
+          if (cell.flag) {
+            ctx.font = (cs * 0.5) + 'px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('🚩', x + cs / 2, y + cs * 0.7);
+          }
+        }
+      }
+    }
+  }
+
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function cellAt(e) {
+    var rc = cv.getBoundingClientRect();
+    var c = ((e.clientX - rc.left) / rc.width * D.cols) | 0;
+    var r = ((e.clientY - rc.top) / rc.height * D.rows) | 0;
+    if (r < 0 || r >= D.rows || c < 0 || c >= D.cols) return null;
+    return { r: r, c: c };
+  }
+
+  cv.addEventListener('click', function (e) {
+    var p = cellAt(e); if (!p) return;
+    openCell(p.r, p.c); draw();
+  });
+  cv.addEventListener('dblclick', function (e) {
+    var p = cellAt(e); if (!p) return;
+    chord(p.r, p.c); draw();
+  });
+  cv.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    var p = cellAt(e); if (!p) return;
+    toggleFlag(p.r, p.c); draw();
+  });
+  cv.addEventListener('mousemove', function (e) { mouse = cellAt(e); draw(); });
+  cv.addEventListener('mouseleave', function () { mouse = null; draw(); });
+
+  document.querySelectorAll('.diff button').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('.diff button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      newGame(+b.dataset.d);
+      WB.sfx.play('click');
+    };
+  });
+  el('btnNew').onclick = function () { newGame(); WB.sfx.play('start'); };
+  el('btnAgain').onclick = function () { newGame(); };
+  el('btnSound').onclick = function () { var on = WB.sfx.toggle(); this.textContent = on ? '🔊' : '🔇'; };
+
+  curDiff = 0; D = null; mouse = null;
+  newGame(0);
+
+  // #autostart：无头自动验证（自动开格/插旗/ chord，覆盖主要代码路径）
+  if (/autostart/.test(location.hash)) {
+    var n = 0;
+    setInterval(function () {
+      if (over) { newGame(); return; }
+      n++;
+      var r = (Math.random() * D.rows) | 0, c = (Math.random() * D.cols) | 0;
+      if (n % 4 === 0) toggleFlag(r, c);
+      else if (n % 7 === 0) chord(r, c);
+      else openCell(r, c);
+      draw();
+    }, 150);
+  }
+})();
+</script>
+</body>
+</html>
