@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { BackTop, Empty, InfiniteLoading, Loading } from '@nutui/nutui-react'
 import type { Note } from '../data'
 import { fetchChannels, fetchFeed, fetchHotSearchesApi, type HotSearchItem } from '../data/api'
+import { useSearchHistory } from '../utils/searchHistory'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute } from '../router'
@@ -93,6 +94,7 @@ export default function Explore() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [showSuggest, setShowSuggest] = useState(false)
   const [hotSearches, setHotSearches] = useState<HotSearchItem[]>([])
+  const { history, addHistory, removeItem, clearHistory } = useSearchHistory()
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
 
   // 动态请求热搜词接口
@@ -123,12 +125,14 @@ export default function Explore() {
   const handleSearch = (kw?: string) => {
     const defaultTerm = hotSearches[0]?.keyword || '范丞丞'
     const q = (typeof kw === 'string' ? kw : searchKeyword).trim() || defaultTerm
+    addHistory(q)
     setShowSuggest(false)
     openSearchResultRoute(q)
   }
 
   const handleTagClick = (tag: string) => {
     const cleanTag = tag.replace(/^🔥\s*/, '').trim()
+    addHistory(cleanTag)
     setSearchKeyword(cleanTag)
     setShowSuggest(false)
     openSearchResultRoute(cleanTag)
@@ -449,21 +453,79 @@ export default function Explore() {
             </button>
           </div>
 
-          {showSuggest && hotSearches.length > 0 && (
+          {showSuggest && (history.length > 0 || hotSearches.length > 0) && (
             <div className="explore-search-suggestions">
-              <div className="explore-suggest-title">热门搜索</div>
-              <div className="explore-suggest-tags">
-                {hotSearches.map((item) => (
-                  <button
-                    key={item.keyword}
-                    type="button"
-                    className={`explore-suggest-tag ${item.isHot ? 'hot' : ''}`}
-                    onClick={() => handleTagClick(item.keyword)}
-                  >
-                    {item.isHot ? `🔥 ${item.keyword}` : item.keyword}
-                  </button>
-                ))}
-              </div>
+              {history.length > 0 && (
+                <div className="explore-suggest-section">
+                  <div className="explore-suggest-header">
+                    <span className="explore-suggest-title">历史记录</span>
+                    <button
+                      type="button"
+                      className="explore-suggest-clear-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        clearHistory()
+                      }}
+                      title="清空历史记录"
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      <span>清空</span>
+                    </button>
+                  </div>
+                  <div className="explore-suggest-tags">
+                    {history.map((item) => (
+                      <div
+                        key={item}
+                        className="explore-history-chip"
+                        onClick={() => handleTagClick(item)}
+                      >
+                        <span className="explore-history-text">{item}</span>
+                        <button
+                          type="button"
+                          className="explore-history-del"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeItem(item)
+                          }}
+                          title="删除"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hotSearches.length > 0 && (
+                <div className="explore-suggest-section">
+                  <div className="explore-suggest-header">
+                    <span className="explore-suggest-title">热门搜索</span>
+                  </div>
+                  <div className="explore-suggest-tags">
+                    {hotSearches.map((item) => (
+                      <button
+                        key={item.keyword}
+                        type="button"
+                        className={`explore-suggest-tag ${item.isHot ? 'hot' : ''}`}
+                        onClick={() => handleTagClick(item.keyword)}
+                      >
+                        {item.isHot ? `🔥 ${item.keyword}` : item.keyword}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </header>

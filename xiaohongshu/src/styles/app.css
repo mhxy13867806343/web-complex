@@ -139,11 +139,90 @@
   animation: searchFadeIn 0.18s ease-out;
 }
 
+.explore-suggest-section {
+  margin-bottom: 12px;
+}
+
+.explore-suggest-section:last-child {
+  margin-bottom: 0;
+}
+
+.explore-suggest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .explore-suggest-title {
   font-size: 12px;
   color: #999999;
-  margin-bottom: 10px;
   font-weight: 500;
+}
+
+.explore-suggest-clear-btn {
+  background: transparent;
+  border: none;
+  color: #999999;
+  font-size: 11.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.explore-suggest-clear-btn:hover {
+  color: var(--xhs-red);
+}
+
+.explore-history-chip {
+  background: #f5f6f8;
+  border-radius: 14px;
+  padding: 4px 8px 4px 12px;
+  font-size: 12px;
+  color: #333333;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.explore-history-chip:hover {
+  background: #ebeef2;
+  color: var(--xhs-red);
+}
+
+.explore-history-text {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explore-history-del {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.explore-history-del:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #ff2442;
 }
 
 .explore-suggest-tags {
@@ -2299,6 +2378,145 @@
   background: #14151a;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
+  position: relative;
+}
+
+/* 搜索页历史记录与热门搜索浮层（暗黑高保真风格） */
+.search-suggest-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 10px;
+  right: 10px;
+  background: #1d1f27;
+  border-radius: 14px;
+  padding: 14px 14px 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 99;
+  animation: searchFadeIn 0.18s ease-out;
+}
+
+.search-suggest-section {
+  margin-bottom: 14px;
+}
+
+.search-suggest-section:last-child {
+  margin-bottom: 0;
+}
+
+.search-suggest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.search-suggest-title {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+.search-suggest-clear-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.search-suggest-clear-btn:hover {
+  color: var(--xhs-red);
+}
+
+.search-suggest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-history-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 5px 8px 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.search-history-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.search-history-chip-text {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-history-chip-del {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.search-history-chip-del:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ff2442;
+}
+
+.search-hot-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.search-hot-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ff2442;
+}
+
+.search-hot-chip.hot {
+  background: rgba(255, 36, 66, 0.14);
+  color: #ff2442;
+  border-color: rgba(255, 36, 66, 0.28);
+  font-weight: 500;
+}
+
+.search-hot-icon {
+  font-size: 11px;
 }
 
 .search-nav-btn {

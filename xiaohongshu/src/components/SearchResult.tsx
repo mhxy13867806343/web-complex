@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Home, Loading } from '@nutui/icons-react'
 import { BackTop } from '@nutui/nutui-react'
 import type { Note } from '../data'
-import { fetchSearchResultsApi, type SearchResultData } from '../data/api'
+import { fetchSearchResultsApi, fetchHotSearchesApi, type SearchResultData, type HotSearchItem } from '../data/api'
+import { useSearchHistory } from '../utils/searchHistory'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
 import { Toast } from './Toast'
 import Waterfall from './Waterfall'
@@ -84,14 +85,42 @@ export default function SearchResult({
     pageRef.current = page
   }, [page])
 
-  // 当外部传入的 keyword 变更时同步
+  const { history, addHistory, removeItem, clearHistory } = useSearchHistory()
+  const [showSuggest, setShowSuggest] = useState(false)
+  const [hotSearches, setHotSearches] = useState<HotSearchItem[]>([])
+  const searchWrapRef = useRef<HTMLDivElement | null>(null)
+
+  // 动态加载热门搜索
+  useEffect(() => {
+    const ac = new AbortController()
+    fetchHotSearchesApi('', ac.signal)
+      .then((res) => {
+        if (res?.list) setHotSearches(res.list)
+      })
+      .catch(() => {})
+    return () => ac.abort()
+  }, [])
+
+  // 点击空白处收起历史和热搜浮层
+  useEffect(() => {
+    const handleDocClick = (e: MouseEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setShowSuggest(false)
+      }
+    }
+    document.addEventListener('mousedown', handleDocClick)
+    return () => document.removeEventListener('mousedown', handleDocClick)
+  }, [])
+
+  // 当外部传入的 keyword 变更时同步并记录历史
   useEffect(() => {
     if (keyword && keyword !== currentKeyword) {
       setKeywordInput(keyword)
       setCurrentKeyword(keyword)
       setActiveSubTag('综合')
+      addHistory(keyword)
     }
-  }, [keyword])
+  }, [keyword, addHistory])
 
   // 发起搜索拉取（重置为第 1 页）
   const loadSearch = useCallback(
@@ -262,6 +291,9 @@ export default function SearchResult({
   const doSearch = (newKw?: string) => {
     const targetKw = (newKw ?? keywordInput).trim()
     if (!targetKw) return
+    addHistory(targetKw)
+    setShowSuggest(false)
+    setKeywordInput(targetKw)
     setCurrentKeyword(targetKw)
     setActiveSubTag('综合')
     openSearchResultRoute(targetKw)
@@ -332,7 +364,7 @@ export default function SearchResult({
   return (
     <div className={`search-page-container ${isClosing ? 'is-closing' : ''}`}>
       {/* 顶部搜索栏 */}
-      <div className="search-page-header">
+      <div className="search-page-header" ref={searchWrapRef}>
         <button
           type="button"
           className="search-nav-btn"
@@ -349,6 +381,7 @@ export default function SearchResult({
             className="search-input-field"
             value={keywordInput}
             placeholder="搜索小红书笔记"
+            onFocus={() => setShowSuggest(true)}
             onChange={(e) => setKeywordInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -401,6 +434,82 @@ export default function SearchResult({
         >
           <Home width={18} height={18} />
         </button>
+
+        {showSuggest && (history.length > 0 || hotSearches.length > 0) && (
+          <div className="search-suggest-dropdown">
+            {history.length > 0 && (
+              <div className="search-suggest-section">
+                <div className="search-suggest-header">
+                  <span className="search-suggest-title">历史记录</span>
+                  <button
+                    type="button"
+                    className="search-suggest-clear-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      clearHistory()
+                    }}
+                    title="清空历史记录"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>清空</span>
+                  </button>
+                </div>
+                <div className="search-suggest-chips">
+                  {history.map((item) => (
+                    <div
+                      key={item}
+                      className="search-history-chip"
+                      onClick={() => doSearch(item)}
+                    >
+                      <span className="search-history-chip-text">{item}</span>
+                      <button
+                        type="button"
+                        className="search-history-chip-del"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeItem(item)
+                        }}
+                        title="删除"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {hotSearches.length > 0 && (
+              <div className="search-suggest-section">
+                <div className="search-suggest-header">
+                  <span className="search-suggest-title">热门搜索</span>
+                </div>
+                <div className="search-suggest-chips">
+                  {hotSearches.map((item) => (
+                    <div
+                      key={item.keyword}
+                      className={`search-hot-chip ${item.isHot ? 'hot' : ''}`}
+                      onClick={() => doSearch(item.keyword)}
+                    >
+                      {item.isHot && <span className="search-hot-icon">🔥</span>}
+                      <span>{item.keyword}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 主类型导航与筛选开关（图 2） */}
