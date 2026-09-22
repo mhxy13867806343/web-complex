@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Popup } from '@nutui/nutui-react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,18 +7,19 @@ import {
   Share,
   Star,
 } from '@nutui/icons-react'
-import type { CommentItem, Note, NoteDetailData } from '../data'
+import type { CommentItem, Note, NoteDetailData, Author } from '../data'
 import { fetchNoteComments, fetchNoteDetail } from '../data/api'
 import { openUserProfileRoute } from '../router'
 import { Toast } from './Toast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
 interface Props {
-  note: Note | null
-  collected: boolean
+  noteId?: string
+  note?: Note | null
+  collected?: boolean
   onCollect?: (note: Note) => void
   onClose: () => void
-  onOpenUser?: (author: Note['author'], note?: Note) => void
+  onOpenUser?: (author: Partial<Author>, note?: Note) => void
 }
 
 function parseCount(raw: string | undefined, delta: number): string {
@@ -30,14 +30,14 @@ function parseCount(raw: string | undefined, delta: number): string {
 }
 
 /**
- * 笔记详情弹窗：
+ * 笔记详情独立路由页面：
  * 1. 真实视频播放（videoUrl）与防盗链直链代理
  * 2. 多图轮播切换（imageList）：手势滑动、左右翻页、2/5 角标、底部圆点指示器、自动轮播
  * 3. 真实正文内容（desc）与话题标签（tags）
- * 4. 真实互动数据：点赞数（likes: "787"）、收藏、分享
+ * 4. 真实互动数据：点赞数、收藏、分享
  * 5. 真实评论区（comments）：只展示、不可点击、不可回复
  */
-export default function NoteDetail({ note, collected, onClose, onOpenUser }: Props) {
+export default function NoteDetail({ noteId, note = null, collected = false, onClose, onOpenUser }: Props) {
   const [coverBroken, setCoverBroken] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [detail, setDetail] = useState<NoteDetailData | null>(null)
@@ -54,32 +54,24 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
   const [isHovered, setIsHovered] = useState(false)
   const isTouching = useRef(false)
 
-  // 平滑关闭动画状态控制：避免 note 突变导致 DOM 瞬间卸载而跳过下滑动画
-  const [activeNote, setActiveNote] = useState<Note | null>(note)
+  const effectiveId = note?.id || noteId || ''
+  const baseId = effectiveId.replace(/_p\d+.*$/, '')
+
   const [isClosing, setIsClosing] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    if (note) {
-      setActiveNote(note)
-      setIsClosing(false)
-      setScrolled(false)
-    }
-  }, [note])
 
   const handleClose = useCallback(() => {
     if (isClosing) return
     setIsClosing(true)
     setTimeout(() => {
       onClose()
-      setActiveNote(null)
       setIsClosing(false)
-    }, 280)
+    }, 220)
   }, [isClosing, onClose])
 
   // 支持键盘 Esc 退出
   useEffect(() => {
-    if (!activeNote || isClosing) return
+    if (isClosing) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Esc') {
         e.preventDefault()
@@ -88,31 +80,39 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeNote, isClosing, handleClose])
+  }, [isClosing, handleClose])
 
-  const currentNote = note || activeNote
+  const currentNote: Note = note || {
+    id: effectiveId,
+    title: detail?.title || '',
+    cover: detail?.imageList?.[0] || '',
+    coverWidth: 3,
+    coverHeight: 4,
+    type: (detail?.type as any) || (detail?.videoUrl ? 'video' : 'normal'),
+    likes: detail?.interactInfo?.likedCount || '0',
+    author: {
+      name: detail?.user?.name || '小红书博主',
+      avatar: detail?.user?.avatar || '',
+      userId: (detail?.user as any)?.userId || '',
+      userUrl: (detail?.user as any)?.userUrl || '',
+    },
+    noteUrl: `https://www.xiaohongshu.com/explore/${baseId}`,
+  }
 
   useEffect(() => {
-    if (!currentNote) {
-      setDetail(null)
-      setComments([])
-      setCommentsCount(0)
-      setCurrentImgIndex(0)
-      return
-    }
+    if (!effectiveId) return
 
     setCurrentImgIndex(0)
     setLoadingDetail(true)
 
     const ac = new AbortController()
 
-    const baseId = currentNote.id.replace(/_p\d+.*$/, '')
-    // 先抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
-    fetchNoteDetail(baseId, currentNote.noteUrl, currentNote, ac.signal)
+    // 抓取笔记详情以获取其真实分类标签、描述与互动数，再针对性获取该笔记的动态专属评论
+    fetchNoteDetail(baseId, note?.noteUrl, note || undefined, ac.signal)
       .then((detailRes) => {
         setDetail(detailRes)
-        const realTitle = detailRes.title || currentNote.title || ''
-        const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : currentNote.tags || []
+        const realTitle = detailRes.title || note?.title || ''
+        const realTags = detailRes.tags && detailRes.tags.length > 0 ? detailRes.tags : note?.tags || []
         const realCount = detailRes.interactInfo?.commentCount || ''
         return fetchNoteComments(baseId, realTitle, realTags, realCount, ac.signal)
       })
@@ -128,7 +128,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
       })
 
     return () => ac.abort()
-  }, [currentNote?.id])
+  }, [effectiveId])
 
   const isVideo = currentNote ? (currentNote.type === 'video' || detail?.type === 'video' || !!detail?.videoUrl) : false
   const images = (detail?.imageList && detail.imageList.length > 0) ? detail.imageList : (currentNote ? [currentNote.cover] : [])
@@ -196,16 +196,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
   }
 
   return (
-    <Popup
-      visible={!!note && !isClosing}
-      position="bottom"
-      closeable={false}
-      style={{ height: '100%', maxHeight: '100%' }}
-      lockScroll={true}
-      closeOnOverlayClick={true}
-      duration={280}
-      onClose={handleClose}
-    >
+    <div className={`note-page-container${isClosing ? ' is-closing' : ''}`}>
       <div
         className={`detail${isClosing ? ' is-closing' : ''}`}
         onTouchStart={(e) => e.stopPropagation()}
@@ -613,6 +604,6 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
           </div>
         </div>
       </div>
-    </Popup>
+    </div>
   )
 }

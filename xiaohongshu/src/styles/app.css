@@ -2082,3 +2082,40 @@
 .user-empty-state span {
   font-size: 36px;
 }
+
+.user-page-end-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px 40px;
+  color: #bbb;
+  font-size: 12px;
+  user-select: none;
+  width: 100%;
+}
+
+.user-page-end-line::before,
+.user-page-end-line::after {
+  content: "";
+  flex: 1;
+  max-width: 60px;
+  height: 0.5px;
+  background: #e2e2e2;
+}
+
+.note-page-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  z-index: 120;
+  overflow: hidden;
+  animation: slideInRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.note-page-container.is-closing {
+  animation: slideOutRight 0.22s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}

@@ -4,9 +4,8 @@ import type { Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
-import { openUserProfileRoute } from '../router'
+import { openUserProfileRoute, openNoteRoute } from '../router'
 import ChannelChips from './ChannelChips'
-import NoteDetail from './NoteDetail'
 import { Toast } from './Toast'
 import Waterfall from './Waterfall'
 
@@ -79,8 +78,6 @@ export default function Explore() {
   const loadingRef = useRef(false)
   /** 接口不可用时标记 */
   const [dead, setDead] = useState<Record<string, boolean>>({})
-  const [collected, setCollected] = useState<Record<string, boolean>>({})
-  const [openNote, setOpenNote] = useState<Note | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   /** 每个流已经「到底」的标记 */
   const [bottom, setBottom] = useState<Record<string, boolean>>({})
@@ -148,8 +145,12 @@ export default function Explore() {
   // 监听浏览器前进 / 后退 / hash 改变，自动同步切换频道
   useEffect(() => {
     const handleUrlChange = () => {
-      // 如果当前处于博主主页等非探索页路由，绝对不触碰或重置探索页的频道状态
-      if (window.location.pathname.startsWith('/user')) {
+      // 如果当前处于博主主页或笔记详情等非探索页路由，绝对不触碰或重置探索页的频道状态
+      if (
+        window.location.pathname.startsWith('/user') ||
+        window.location.pathname.startsWith('/explore/') ||
+        window.location.pathname.startsWith('/note')
+      ) {
         return
       }
       const ch = getInitialChannel()
@@ -188,7 +189,11 @@ export default function Explore() {
 
   // 首屏 + 每次切频道发起 Ajax 请求（已有缓存数据时直接复用，杜绝返回或切回频道时重复发请求）
   useEffect(() => {
-    if (window.location.pathname.startsWith('/user')) {
+    if (
+      window.location.pathname.startsWith('/user') ||
+      window.location.pathname.startsWith('/explore/') ||
+      window.location.pathname.startsWith('/note')
+    ) {
       return
     }
     if (feedsRef.current[channel]?.length) {
@@ -200,20 +205,20 @@ export default function Explore() {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  /** 下拉刷新：详情弹窗打开时彻底关闭，防止任何下拉手势穿透触发主页刷新 */
+  /** 下拉刷新 */
   const { distance, pulling, refreshing } = usePullToRefresh(
     SCROLLER,
     async () => {
       const n = await load(channel, false, 'refresh')
       if (n) Toast.show({ content: `已刷新 ${n} 条最新笔记`, duration: 1.6 })
     },
-    !openNote
+    true
   )
 
   /** 上拉加载：每一次都发起真实的 Ajax / Fetch 请求并追加数据 */
   const loadMore = useCallback(() => {
     return new Promise<void>((resolve) => {
-      if (openNote || loadingRef.current || dead[channel] || bottom[channel]) {
+      if (loadingRef.current || dead[channel] || bottom[channel]) {
         resolve()
         return
       }
@@ -221,13 +226,13 @@ export default function Explore() {
         resolve()
       })
     })
-  }, [channel, dead, bottom, load, openNote])
+  }, [channel, dead, bottom, load])
 
   /** 滚动触底检测双保险（同时监听 window 和 #page-body，确保任何视口/设备下均能触底加载） */
   useEffect(() => {
     const el = document.getElementById(SCROLLER_ID)
     const checkAndLoad = () => {
-      if (openNote || loadingRef.current || bottom[channel] || dead[channel]) return
+      if (loadingRef.current || bottom[channel] || dead[channel]) return
 
       let distanceToBottom = 9999
       if (el && el.scrollHeight > el.clientHeight) {
@@ -253,22 +258,16 @@ export default function Explore() {
     }
   }, [channel, bottom, dead, load])
 
-  const toggleCollect = (note: Note) => {
-    const next = !collected[note.id]
-    setCollected((prev) => ({ ...prev, [note.id]: next }))
-    Toast.show({ content: next ? '已收藏' : '已取消收藏', duration: 1.2 })
-  }
-
   // 左右滑动手势切换频道（像小红书原生 App 一样左右滑屏切 Tab）
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 })
   const onFeedTouchStart = (e: React.TouchEvent) => {
-    if (pulling || refreshing || openNote) return
+    if (pulling || refreshing) return
     const t = e.touches[0]
     touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() }
   }
 
   const onFeedTouchEnd = (e: React.TouchEvent) => {
-    if (pulling || refreshing || openNote) return
+    if (pulling || refreshing) return
     const t = e.changedTouches[0]
     const dx = t.clientX - touchStartRef.current.x
     const dy = t.clientY - touchStartRef.current.y
@@ -347,7 +346,7 @@ export default function Explore() {
             <div key={channel} className="feed-transition-wrap">
               <Waterfall
                 notes={list}
-                onOpen={setOpenNote}
+                onOpen={(n) => openNoteRoute(n.id)}
                 onOpenUser={(author) => openUserProfileRoute(author)}
               />
             </div>
@@ -380,14 +379,6 @@ export default function Explore() {
         loadingText="正在加载更多…"
         loadMoreText="已经到底了"
         onLoadMore={loadMore}
-      />
-
-      <NoteDetail
-        note={openNote}
-        collected={openNote ? !!collected[openNote.id] : false}
-        onCollect={toggleCollect}
-        onClose={() => setOpenNote(null)}
-        onOpenUser={(author) => openUserProfileRoute(author)}
       />
 
       {/* NutUI BackTop 返回顶部 */}

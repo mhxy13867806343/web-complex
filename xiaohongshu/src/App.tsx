@@ -1,12 +1,14 @@
 import Explore from './components/Explore'
 import UserPage from './components/UserPage'
+import NoteDetail from './components/NoteDetail'
 import { ToastHost } from './components/Toast'
-import { useRoute, navigate } from './router'
+import { useRoute, navigate, openNoteRoute, openUserProfileRoute } from './router'
 
 /**
  * 路由驱动的应用顶级入口：
  * 1. 发现页路由（/ 或 /?channel=...）渲染 Explore
  * 2. 用户主页路由（/user/profile/:userId 或 /user/:userId）渲染独立页面 UserPage
+ * 3. 笔记详情路由（/explore/:noteId）渲染独立页面 NoteDetail
  */
 export default function App() {
   const route = useRoute()
@@ -15,11 +17,11 @@ export default function App() {
     <div className="phone">
       {/* 注意：这个 id 是必需的 —— NutUI 的 InfiniteLoading 用 document.getElementById(target) 找滚动容器，
           传类名选择器（'.page-body'）会找不到，它会静默回退到 window，导致上拉加载永远不触发。 */}
-      {/* 发现页保持常驻挂载：避免查看博主主页返回后数据重置、二次加载或空状态闪烁 */}
+      {/* 发现页保持常驻挂载：避免查看博主主页或笔记详情返回后数据重置、二次加载或空状态闪烁 */}
       <div
         className="page-body"
         id="page-body"
-        style={{ display: route.name === 'user' ? 'none' : 'block' }}
+        style={{ display: route.name === 'home' ? 'block' : 'none' }}
       >
         <Explore />
       </div>
@@ -36,7 +38,24 @@ export default function App() {
             }
           }}
           onOpenNote={(note) => {
-            navigate(`/?channel=推荐&note=${note.id}`)
+            openNoteRoute(note.id)
+          }}
+        />
+      )}
+
+      {route.name === 'note' && (
+        <NoteDetail
+          key={route.noteId}
+          noteId={route.noteId || ''}
+          onClose={() => {
+            if (window.history.length > 1) {
+              window.history.back()
+            } else {
+              navigate('/')
+            }
+          }}
+          onOpenUser={(author) => {
+            openUserProfileRoute(author)
           }}
         />
       )}

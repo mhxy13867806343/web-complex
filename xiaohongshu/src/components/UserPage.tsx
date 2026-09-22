@@ -221,18 +221,23 @@ export default function UserPage({ userId, knownNotes = [], onBack, onOpenNote }
                   <p>暂无公开笔记</p>
                 </div>
               ) : (
-                <div className="waterfall">
-                  <div className="waterfall-col">
-                    {leftCol.map((note) => (
-                      <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
-                    ))}
+                <>
+                  <div className="waterfall">
+                    <div className="waterfall-col">
+                      {leftCol.map((note) => (
+                        <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
+                      ))}
+                    </div>
+                    <div className="waterfall-col">
+                      {rightCol.map((note) => (
+                        <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="waterfall-col">
-                    {rightCol.map((note) => (
-                      <NoteCard key={note.id} note={note} onOpen={onOpenNote} />
-                    ))}
+                  <div className="user-page-end-line">
+                    <span>— 我是有底线的 —</span>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </>

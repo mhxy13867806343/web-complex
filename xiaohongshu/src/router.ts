@@ -3,8 +3,9 @@ import type { Author } from './data'
 
 export interface RouteInfo {
   path: string
-  name: 'home' | 'user'
+  name: 'home' | 'user' | 'note'
   userId?: string
+  noteId?: string
   author?: Author
   channel?: string
   query: Record<string, string>
@@ -98,6 +99,25 @@ export function parseRoute(rawUrl?: string): RouteInfo {
       }
     }
 
+    // 匹配笔记详情路由：/explore/:noteId 或 /note/:noteId 或 /discovery/item/:noteId 或 ?note=xxx
+    const noteMatch = pathname.match(/^\/(?:explore|note|discovery\/item)\/([^/?#]+)/)
+    const noteQueryId = searchParams.get('noteId') || searchParams.get('note')
+
+    if (noteMatch || (noteQueryId && pathname === '/')) {
+      const noteId = noteMatch ? decodeURIComponent(noteMatch[1]) : noteQueryId!
+      const cleanPath = `/explore/${noteId}`
+      if (typeof window !== 'undefined' && window.location.pathname !== cleanPath) {
+        window.history.replaceState({}, '', cleanPath)
+      }
+
+      return {
+        path: cleanPath,
+        name: 'note',
+        noteId,
+        query,
+      }
+    }
+
     return {
       path: pathname,
       name: 'home',
@@ -135,6 +155,14 @@ export function navigate(to: string, replace = false) {
 export function openUserProfileRoute(author: Partial<Author> & { name?: string; avatar?: string; userId?: string; userUrl?: string }) {
   const userId = resolveUserId(author)
   navigate(`/user/profile/${userId}`)
+}
+
+/**
+ * 跳转到笔记详情页的独立路由（对齐小红书官方规范 /explore/:noteId）
+ */
+export function openNoteRoute(target: string | { id: string }) {
+  const noteId = typeof target === 'string' ? target : target.id
+  navigate(`/explore/${noteId}`)
 }
 
 /**
