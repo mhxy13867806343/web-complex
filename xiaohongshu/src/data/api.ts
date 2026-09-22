@@ -51,11 +51,13 @@ function isStaticEnvironment(): boolean {
   if (typeof window === 'undefined') return true
   // 显式指定了自定义 API
   if (import.meta.env?.VITE_API_BASE) return false
-  // 生产构建产物（dist 目录）或 GitHub Pages 静态环境
-  if (import.meta.env?.PROD) return true
   const host = window.location.hostname
+  // 本地开发或本地 Node 服务（localhost, 127.0.0.1）连接动态 /api/xhs/* 爬虫服务
+  if (['localhost', '127.0.0.1', '0.0.0.0'].includes(host)) return false
+  // 线上生产静态部署环境（如 GitHub Pages、静态 CDN 等）
+  if (import.meta.env?.PROD) return true
   if (host.endsWith('github.io') || host.endsWith('gitee.io')) return true
-  return !['localhost', '127.0.0.1', '0.0.0.0'].includes(host)
+  return true
 }
 
 function getApiBase(): string {
@@ -81,9 +83,15 @@ export async function fetchChannels(signal?: AbortSignal) {
 
   const base = getApiBase()
   const url = base ? `${base.replace(/\/$/, '')}/api/xhs/channels` : '/api/xhs/channels'
-  const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return (await res.json()) as { fetchedAt: string; channels: ChannelItem[] }
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      return (await res.json()) as { fetchedAt: string; channels: ChannelItem[] }
+    }
+  } catch {
+    /* 降级到静态兜底分类 */
+  }
+  return { fetchedAt: new Date().toISOString(), channels: STATIC_CHANNELS }
 }
 
 /** 拉取某个流的笔记 */
@@ -147,8 +155,15 @@ export async function fetchFeed(
   qs.set('t', String(Date.now()))
   const path = `/api/xhs/feed?${qs.toString()}`
   const url = base ? `${base.replace(/\/$/, '')}${path}` : path
-  const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = (await res.json()) as FeedResult
-  return { ...data, page }
+  try {
+    const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      const data = (await res.json()) as FeedResult
+      return { ...data, page }
+    }
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') throw err
+    /* 遇到风控或超时优雅回退到内置数据集，保证页面不白屏不报错 */
+  }
+  return { ...getStaticFeed(ch, page, 10), page }
 }
