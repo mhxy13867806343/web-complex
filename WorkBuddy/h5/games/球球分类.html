@@ -79,7 +79,7 @@
   var elMv = document.getElementById('mv'), elLv = document.getElementById('lv');
   var over = document.getElementById('over'), overP = document.getElementById('overP');
 
-  var tubes, colors, moves, undoStack, sel, flying, locked;
+  var tubes, colors, moves, undoStack, sel, flying, locked, skip;
 
   // ---- 关卡生成 ----
   function build(nColor) {
@@ -95,7 +95,7 @@
     pool.forEach(function (v, idx) { tubes[idx % nColor].push(v); });
     tubes.push([]); tubes.push([]);       // 两根空管
     colors = nColor;
-    moves = 0; sel = null; flying = []; locked = false;
+    moves = 0; sel = null; flying = []; locked = false; skip = {};
     undoStack = [];
     elMv.textContent = '0';
     over.classList.remove('show');
@@ -254,6 +254,7 @@
       // 起点 = 该球在源管中的原索引（pop 后长度即原索引）；终点 = 目标管中刚 push 的位置
       (function (startIdx, endIdx, val, d) {
         var a = ballXY(from, startIdx);
+        skip[i + ':' + endIdx] = true;   // 球已进目标管但还在飞，先不画管里那颗，避免重影
         flying.push({ ci: val, x: a.x, y: a.y, sx: a.x, sy: a.y, tx: 0, ty: 0, delay: d, ti: i, bi: endIdx });
       })(tubes[from].length, tubes[i].length - 1, val, k * 90);
     }
@@ -282,7 +283,7 @@
       draw();
       if (alive) requestAnimationFrame(frame);
       else {
-        flying.length = 0; locked = false;
+        flying.length = 0; locked = false; skip = {};
         WB.sfx.play('pop');
         if (isDone()) {
           WB.sfx.play('win');

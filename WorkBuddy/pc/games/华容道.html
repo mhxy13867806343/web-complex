@@ -132,6 +132,13 @@
 
   var disp = {};               // 方块数值 -> 当前显示坐标（用于平滑滑动）
 
+  // 取 (r,c) 格方块的显示坐标：有缓动缓存用缓存（平滑滑动），否则用格子目标位置
+  function displayPos(r, c) {
+    var tx = PAD + c * (CELL + GAP), ty = PAD + r * (CELL + GAP);
+    var p = disp[board[r][c]];
+    return p ? p : { x: tx, y: ty };
+  }
+
   function fmt(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
   function swap(r, c) {

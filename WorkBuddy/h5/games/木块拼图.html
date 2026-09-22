@@ -139,6 +139,9 @@
   function gy(r) { return pad + r * cell; }
 
   function rr(x, y, w, h, r) {
+    if (w < 0) { x += w; w = -w; }
+    if (h < 0) { y += h; h = -h; }
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));   // 钳制半径非负且不超半边，避免 arcTo 抛错
     ctx.beginPath();
     ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
@@ -241,7 +244,8 @@
   }
 
   function drawShapeIn(sh, box, scale) {
-    var maxCell = Math.min((box.w - 16) / sh.w, (box.h - 16) / sh.h, cell * scale);
+    var maxCell = Math.max(0, Math.min((box.w - 16) / sh.w, (box.h - 16) / sh.h, cell * scale));
+    if (maxCell <= 0) return;   // 尺寸未就绪（layout 前的首绘）时跳过，避免负尺寸
     var w = sh.w * maxCell, h = sh.h * maxCell;
     var ox = box.x + (box.w - w) / 2, oy = box.y + (box.h - h) / 2;
     sh.cells.forEach(function (p) { drawCell(ox + p[1] * maxCell, oy + p[0] * maxCell, maxCell, sh.color); });
