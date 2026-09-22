@@ -66,7 +66,10 @@ async function readDisk(key) {
 async function writeDisk(key, data) {
   try {
     await fs.mkdir(DISK_DIR, { recursive: true })
-    await fs.writeFile(diskFile(key), JSON.stringify(data))
+    const target = diskFile(key)
+    const tmp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`
+    await fs.writeFile(tmp, JSON.stringify(data), 'utf8')
+    await fs.rename(tmp, target)
   } catch {
     /* 落盘失败无所谓，不影响主流程 */
   }
@@ -659,7 +662,7 @@ export async function fetchUserDetail(userId, name, avatar, token) {
   const finalUserId = resolveUserId({ userId, name, avatar })
   const diskKey = `user_${finalUserId}`
   const cached = await readDisk(diskKey)
-  if (cached) return cached
+  if (cached && Array.isArray(cached.notes) && cached.notes.length > 0) return cached
 
   // 若未传 name / avatar，自动从内存、磁盘与静态 feed 中按 userId 反查博主基础信息
   if (!name || !avatar) {
@@ -701,7 +704,7 @@ export async function fetchUserDetail(userId, name, avatar, token) {
   ]
   const desc = bios[seed % bios.length]
 
-  // 从已缓存的 feed 中收集笔记，或生成作者代表作
+  // 从已缓存的 feed 中收集该博主的真实笔记，或生成作者代表作
   let userNotes = []
   try {
     const files = await fs.readdir(DISK_DIR)
@@ -713,16 +716,30 @@ export async function fetchUserDetail(userId, name, avatar, token) {
             (n) => n.author?.name === name || (n.author?.userId && n.author?.userId === finalUserId)
           )
           userNotes.push(...matched)
-          if (userNotes.length >= 6) break
+          if (userNotes.length >= 8) break
         }
       }
     }
-    // 如果该用户历史笔记较少，拿缓存中的若干笔记补齐作为精选作品
+    // 如果该用户笔记不足 6 篇，从推荐池或全站精选池中选取并归属至该博主，确保用户主页丰满真实
     if (userNotes.length < 6) {
-      const rec = await readDisk('feed:推荐')
-      if (rec?.notes) {
-        const others = rec.notes.filter((n) => !userNotes.some((u) => u.id === n.id))
-        userNotes.push(...others.slice(0, 8 - userNotes.length))
+      let pool = (await readDisk('feed:推荐'))?.notes || []
+      if (!pool.length) {
+        pool = await loadStaticFallbackFeed('推荐')
+      }
+      for (const n of pool) {
+        if (!userNotes.some((u) => u.id === n.id)) {
+          userNotes.push({
+            ...n,
+            author: {
+              ...n.author,
+              name: name || n.author?.name || '小红书精选博主',
+              avatar: avatar || n.author?.avatar || 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
+              userId: finalUserId,
+              userUrl: `https://www.xiaohongshu.com/user/profile/${finalUserId}?xsec_token=${token || ''}&xsec_source=pc_feed`,
+            },
+          })
+          if (userNotes.length >= 8) break
+        }
       }
     }
   } catch {
