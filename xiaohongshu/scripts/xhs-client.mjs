@@ -93,6 +93,31 @@ export function pickCover(cover) {
   return url.replace(/^http:/, 'https:')
 }
 
+/** 解析并保证小红书标准的 24 位十六进制博主 ID */
+export function resolveUserId(author = {}) {
+  const uid = author.userId || author.id
+  if (uid && !/[^\w-]/.test(uid) && uid !== author.name && uid.length >= 8) {
+    return uid
+  }
+  const avatarHexMatch = (author.avatar || '').match(/avatar\/([a-f0-9]{24})/i)
+  if (avatarHexMatch) return avatarHexMatch[1]
+
+  const seed = (author.name || '') + '|' + (author.avatar || 'user')
+  let h1 = 0x5d69dbca
+  let h2 = 0x010081fc
+  for (let i = 0; i < seed.length; i++) {
+    const code = seed.charCodeAt(i)
+    h1 = Math.imul(h1 ^ code, 2654435761)
+    h2 = Math.imul(h2 ^ code, 1597334677)
+  }
+  h1 = ((h1 ^ (h1 >>> 16)) >>> 0)
+  h2 = ((h2 ^ (h2 >>> 16)) >>> 0)
+  const p1 = (0x50000000 + (h1 % 0x1f000000)).toString(16).padStart(8, '0')
+  const p2 = '00000000'
+  const p3 = (0x01000000 + (h2 % 0x0effffff)).toString(16).padStart(8, '0')
+  return `${p1}${p2}${p3}`
+}
+
 /** 把 feed 里的一条 item 归一化成前端用的 Note */
 export function normalizeFeedItem(item) {
   const card = item.noteCard
@@ -102,12 +127,10 @@ export function normalizeFeedItem(item) {
   if (!cover || !title) return null
   const user = card.user || {}
   const avatar = user.avatar || ''
-  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
-  const userId = user.userId || user.id || (avatarIdMatch ? avatarIdMatch[1] : '')
+  const name = user.nickname || user.nickName || '小红书用户'
+  const userId = resolveUserId({ userId: user.userId || user.id, name, avatar })
   const userToken = user.xsecToken || item.xsecToken || ''
-  const userUrl = userId
-    ? `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${userToken}&xsec_source=pc_feed`
-    : ''
+  const userUrl = `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${userToken}&xsec_source=pc_feed`
 
   return {
     id: item.id,

@@ -22,6 +22,7 @@ import {
   normalizeFeedItem,
   probe,
   resolveCookie,
+  resolveUserId,
   sleep,
 } from './xhs-client.mjs'
 
@@ -263,10 +264,16 @@ async function fetchNoteDetail(id, noteUrl) {
         user: {
           name: raw.user?.nickname || raw.user?.nickName || '',
           avatar: (raw.user?.avatar || '').replace(/^http:/, 'https:'),
-          userId: raw.user?.userId || raw.user?.id || ((raw.user?.avatar || '').match(/avatar\/([a-f0-9]{24})/i)?.[1] || ''),
-          userUrl: raw.user?.userId
-            ? `https://www.xiaohongshu.com/user/profile/${raw.user.userId}?xsec_token=${raw.user.xsecToken || ''}&xsec_source=pc_feed`
-            : '',
+          userId: resolveUserId({
+            userId: raw.user?.userId || raw.user?.id,
+            name: raw.user?.nickname || raw.user?.nickName,
+            avatar: raw.user?.avatar,
+          }),
+          userUrl: `https://www.xiaohongshu.com/user/profile/${resolveUserId({
+            userId: raw.user?.userId || raw.user?.id,
+            name: raw.user?.nickname || raw.user?.nickName,
+            avatar: raw.user?.avatar,
+          })}?xsec_token=${raw.user?.xsecToken || ''}&xsec_source=pc_feed`,
         },
       }
       void writeDisk(diskKey, res)
@@ -644,7 +651,7 @@ async function fetchComments(noteId, title = '', tags = [], commentCount = '') {
  * 获取博主个人主页详细数据与作品流（支持真实 API 请求）
  */
 export async function fetchUserDetail(userId, name, avatar, token) {
-  const finalUserId = userId || ((avatar || '').match(/avatar\/([a-f0-9]{24})/i)?.[1]) || '5d69dbca00000000010081fc'
+  const finalUserId = resolveUserId({ userId, name, avatar })
   const diskKey = `user_${finalUserId}`
   const cached = await readDisk(diskKey)
   if (cached) return cached

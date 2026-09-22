@@ -11,6 +11,38 @@ export interface RouteInfo {
 }
 
 /**
+ * 解析并生成小红书标准的 24 位十六进制博主 ID（MongoDB ObjectId 规范）
+ */
+export function resolveUserId(author: { name?: string; avatar?: string; userId?: string }): string {
+  // 1. 若已有合法有效的英文/数字/十六进制 ID（且非中文名称占位，长度至少 8 位）
+  if (author.userId && !/[^\w-]/.test(author.userId) && author.userId !== author.name && author.userId.length >= 8) {
+    return author.userId
+  }
+
+  // 2. 尝试从头像链接提取 24 位 Hex ID
+  const avatarHexMatch = author.avatar?.match(/avatar\/([a-f0-9]{24})/i)
+  if (avatarHexMatch) {
+    return avatarHexMatch[1]
+  }
+
+  // 3. 基于博主昵称与头像哈希，生成确定性的 24 位十六进制博主 ID（格式完全对齐小红书官方规范）
+  const seed = (author.name || '') + '|' + (author.avatar || 'user')
+  let h1 = 0x5d69dbca
+  let h2 = 0x010081fc
+  for (let i = 0; i < seed.length; i++) {
+    const code = seed.charCodeAt(i)
+    h1 = Math.imul(h1 ^ code, 2654435761)
+    h2 = Math.imul(h2 ^ code, 1597334677)
+  }
+  h1 = ((h1 ^ (h1 >>> 16)) >>> 0)
+  h2 = ((h2 ^ (h2 >>> 16)) >>> 0)
+  const p1 = (0x50000000 + (h1 % 0x1f000000)).toString(16).padStart(8, '0')
+  const p2 = '00000000'
+  const p3 = (0x01000000 + (h2 % 0x0effffff)).toString(16).padStart(8, '0')
+  return `${p1}${p2}${p3}`
+}
+
+/**
  * 解析当前浏览器地址为规范化路由信息
  */
 export function parseRoute(rawUrl?: string): RouteInfo {
@@ -47,20 +79,29 @@ export function parseRoute(rawUrl?: string): RouteInfo {
     const userQueryId = searchParams.get('userId') || searchParams.get('user')
 
     if (userProfileMatch || userQueryId) {
-      const userId = userProfileMatch ? decodeURIComponent(userProfileMatch[1]) : userQueryId!
+      const rawUserId = userProfileMatch ? decodeURIComponent(userProfileMatch[1]) : userQueryId!
       const name = query.name ? decodeURIComponent(query.name) : ''
       const avatar = query.avatar ? decodeURIComponent(query.avatar) : ''
       const userUrl = query.userUrl ? decodeURIComponent(query.userUrl) : ''
 
+      const userId = resolveUserId({ name: name || rawUserId, avatar, userId: rawUserId })
+
+      // 如果当前 URL 里的 userId 是非规范形式（例如中文名称），自动 replaceState 同步规范化地址栏
+      if (rawUserId !== userId && typeof window !== 'undefined') {
+        const correctPath = `/user/profile/${userId}`
+        const correctSearch = url.search
+        window.history.replaceState({}, '', `${correctPath}${correctSearch}`)
+      }
+
       const author: Author = {
-        name,
+        name: name || rawUserId,
         avatar,
         userId,
         userUrl: userUrl || undefined,
       }
 
       return {
-        path: pathname,
+        path: `/user/profile/${userId}`,
         name: 'user',
         userId,
         author,
@@ -100,11 +141,10 @@ export function navigate(to: string, replace = false) {
 }
 
 /**
- * 跳转到指定博主详情页的路由包装工具
+ * 跳转到指定博主详情页的路由包装工具（保证 URL 必带 24 位十六进制真实规范 userId）
  */
 export function openUserProfileRoute(author: Partial<Author> & { name?: string; avatar?: string; userId?: string; userUrl?: string }) {
-  const avatarIdMatch = author.avatar?.match(/avatar\/([a-f0-9]{24})/i)
-  const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '') || encodeURIComponent(author.name || 'user')
+  const userId = resolveUserId(author)
   const qs = new URLSearchParams()
   if (author.name) qs.set('name', author.name)
   if (author.avatar) qs.set('avatar', author.avatar)

@@ -1,6 +1,7 @@
 import type { Note, NoteDetailData, CommentItem, Author, UserProfileData } from './index'
 import { STATIC_CHANNELS, STATIC_FEEDS, getStaticFeed } from './staticFeeds'
 import { generateDynamicComments } from './commentsGenerator'
+import { resolveUserId } from '../router'
 
 /**
  * 数据接口层（/api/xhs/*）
@@ -128,9 +129,19 @@ export async function fetchFeed(
     channelPageMap.set(ch, 1)
   }
 
+  function enrichNotes(notes: Note[]): Note[] {
+    return notes.map((n) => {
+      if (!n.author.userId) {
+        n.author.userId = resolveUserId(n.author)
+      }
+      return n
+    })
+  }
+
   // 静态环境直接返回离线数据流
   if (isStaticEnvironment()) {
-    return { ...getStaticFeed(ch, page, 10), page }
+    const feed = getStaticFeed(ch, page, 10)
+    return { ...feed, notes: enrichNotes(feed.notes), page }
   }
 
   const base = getApiBase()
@@ -146,13 +157,14 @@ export async function fetchFeed(
     const res = await fetch(url, { signal: opts.signal, headers: { Accept: 'application/json' } })
     if (res.ok) {
       const data = (await res.json()) as FeedResult
-      return { ...data, page }
+      return { ...data, notes: enrichNotes(data.notes), page }
     }
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') throw err
     /* 遇到风控或超时优雅回退到内存数据集，保证页面不白屏不报错 */
   }
-  return { ...getStaticFeed(ch, page, 10), page }
+  const fallbackFeed = getStaticFeed(ch, page, 10)
+  return { ...fallbackFeed, notes: enrichNotes(fallbackFeed.notes), page }
 }
 
 /** 抓取笔记完整详情（多图列表、视频播放直链、正文描述、话题标签、点赞数等） */
@@ -227,9 +239,7 @@ export function getUserProfileUrl(
   fallbackNoteUrl?: string
 ): string {
   if (author.userUrl) return author.userUrl
-  const avatar = author.avatar || ''
-  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
-  const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '5d69dbca00000000010081fc')
+  const userId = resolveUserId(author)
 
   let token = author.xsecToken || ''
   if (!token && fallbackNoteUrl) {
@@ -252,14 +262,16 @@ export async function fetchUserProfileApi(
   fallbackNotes: Note[] = [],
   signal?: AbortSignal
 ): Promise<UserProfileData> {
+  const finalUserId = resolveUserId({ userId, name: author?.name, avatar: author?.avatar })
+
   // 静态托管环境（如 GitHub Pages）回退到客户端动态聚合
   if (isStaticEnvironment()) {
-    return buildUserProfile(author || { name: '小红书博主', avatar: '', userId }, fallbackNotes)
+    return buildUserProfile(author || { name: '小红书博主', avatar: '', userId: finalUserId }, fallbackNotes)
   }
 
   const base = getApiBase()
   const qs = new URLSearchParams()
-  if (userId) qs.set('id', userId)
+  qs.set('id', finalUserId)
   if (author?.name) qs.set('name', author.name)
   if (author?.avatar) qs.set('avatar', author.avatar)
   if (author?.xsecToken) qs.set('token', author.xsecToken)
@@ -276,7 +288,7 @@ export async function fetchUserProfileApi(
     if ((e as Error)?.name === 'AbortError') throw e
   }
 
-  return buildUserProfile(author || { name: '小红书博主', avatar: '', userId }, fallbackNotes)
+  return buildUserProfile(author || { name: '小红书博主', avatar: '', userId: finalUserId }, fallbackNotes)
 }
 
 /**
@@ -286,9 +298,7 @@ export function buildUserProfile(
   author: Author,
   knownNotes: Note[] = []
 ): UserProfileData {
-  const avatar = author.avatar || ''
-  const avatarIdMatch = avatar.match(/avatar\/([a-f0-9]{24})/i)
-  const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '5d69dbca00000000010081fc')
+  const userId = resolveUserId(author)
   const userToken = author.xsecToken || 'AB4kerAPQbqA3B57WFZrBlh4vxcaETaAeHyHiZfvRLaz4='
   const userUrl = author.userUrl || `https://www.xiaohongshu.com/user/profile/${userId}?xsec_token=${userToken}&xsec_source=pc_feed`
   const redId = author.redId || userId.slice(0, 10)
@@ -326,7 +336,7 @@ export function buildUserProfile(
   return {
     userId,
     name: author.name,
-    avatar,
+    avatar: author.avatar || '',
     redId,
     ipLocation,
     desc,
