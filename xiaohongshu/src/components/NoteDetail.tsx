@@ -9,7 +9,8 @@ import {
   Star,
 } from '@nutui/icons-react'
 import type { CommentItem, Note, NoteDetailData } from '../data'
-import { fetchNoteComments, fetchNoteDetail, getUserProfileUrl } from '../data/api'
+import { fetchNoteComments, fetchNoteDetail } from '../data/api'
+import { openUserProfileRoute } from '../router'
 import { Toast } from './Toast'
 import CustomVideoPlayer from './CustomVideoPlayer'
 
@@ -440,9 +441,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
               if (onOpenUser) {
                 onOpenUser(author, currentNote)
               } else {
-                const url = getUserProfileUrl(author, currentNote.noteUrl)
-                window.open(url, '_blank', 'noopener,noreferrer')
-                Toast.show({ content: '跳转博主原站主页', duration: 1.2 })
+                openUserProfileRoute(author)
               }
             }}
           >
@@ -506,9 +505,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                         if (onOpenUser) {
                           onOpenUser(item.user)
                         } else {
-                          const url = getUserProfileUrl(item.user, currentNote.noteUrl)
-                          window.open(url, '_blank', 'noopener,noreferrer')
-                          Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                          openUserProfileRoute(item.user)
                         }
                       }}
                     />
@@ -520,9 +517,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                           if (onOpenUser) {
                             onOpenUser(item.user)
                           } else {
-                            const url = getUserProfileUrl(item.user, currentNote.noteUrl)
-                            window.open(url, '_blank', 'noopener,noreferrer')
-                            Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                            openUserProfileRoute(item.user)
                           }
                         }}
                       >
@@ -554,9 +549,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                               if (onOpenUser) {
                                 onOpenUser(sub.user)
                               } else {
-                                const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
-                                window.open(url, '_blank', 'noopener,noreferrer')
-                                Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                                openUserProfileRoute(sub.user)
                               }
                             }}
                           />
@@ -568,9 +561,7 @@ export default function NoteDetail({ note, collected, onClose, onOpenUser }: Pro
                                 if (onOpenUser) {
                                   onOpenUser(sub.user)
                                 } else {
-                                  const url = getUserProfileUrl(sub.user, currentNote.noteUrl)
-                                  window.open(url, '_blank', 'noopener,noreferrer')
-                                  Toast.show({ content: '跳转用户原站主页', duration: 1.2 })
+                                  openUserProfileRoute(sub.user)
                                 }
                               }}
                             >

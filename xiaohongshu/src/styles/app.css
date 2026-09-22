@@ -1640,9 +1640,9 @@
    用户主页全屏组件（UserPage）
    ========================================================================== */
 .user-page-container {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 1500;
+  z-index: 50;
   background: #ffffff;
   display: flex;
   flex-direction: column;

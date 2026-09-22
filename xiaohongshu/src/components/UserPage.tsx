@@ -6,13 +6,14 @@ import { Toast } from './Toast'
 import NoteCard from './NoteCard'
 
 interface Props {
-  author: Author
+  userId?: string
+  author?: Author
   knownNotes?: Note[]
   onBack: () => void
   onOpenNote: (note: Note) => void
 }
 
-export default function UserPage({ author, knownNotes = [], onBack, onOpenNote }: Props) {
+export default function UserPage({ userId, author, knownNotes = [], onBack, onOpenNote }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'notes' | 'collects'>('notes')
@@ -25,10 +26,15 @@ export default function UserPage({ author, knownNotes = [], onBack, onOpenNote }
     const ac = new AbortController()
     setLoading(true)
 
-    const avatarIdMatch = author.avatar?.match(/avatar\/([a-f0-9]{24})/i)
-    const userId = author.userId || (avatarIdMatch ? avatarIdMatch[1] : '')
+    const avatarIdMatch = author?.avatar?.match(/avatar\/([a-f0-9]{24})/i)
+    const effectiveUserId = userId || author?.userId || (avatarIdMatch ? avatarIdMatch[1] : '')
+    const effectiveAuthor: Author = author || {
+      name: '',
+      avatar: '',
+      userId: effectiveUserId,
+    }
 
-    fetchUserProfileApi(userId, author, knownNotes, ac.signal)
+    fetchUserProfileApi(effectiveUserId, effectiveAuthor, knownNotes, ac.signal)
       .then((data) => {
         setProfile(data)
         setLoading(false)
@@ -39,20 +45,7 @@ export default function UserPage({ author, knownNotes = [], onBack, onOpenNote }
       })
 
     return () => ac.abort()
-  }, [author.userId, author.name, author.avatar])
-
-  // 锁定父页面滚动
-  useEffect(() => {
-    const scroller = document.querySelector('#page-body') as HTMLElement | null
-    const originalOverflow = scroller?.style.overflow || ''
-    if (scroller) scroller.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      if (scroller) scroller.style.overflow = originalOverflow
-      document.body.style.overflow = ''
-    }
-  }, [])
+  }, [userId, author?.userId, author?.name, author?.avatar])
 
   const handleBack = () => {
     if (isClosing) return
