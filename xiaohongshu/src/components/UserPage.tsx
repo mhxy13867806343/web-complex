@@ -16,7 +16,6 @@ export default function UserPage({ author, knownNotes = [], onBack, onOpenNote }
   const [profile, setProfile] = useState<UserProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'notes' | 'collects'>('notes')
-  const [following, setFollowing] = useState(false)
   const [avatarBroken, setAvatarBroken] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
@@ -161,30 +160,6 @@ export default function UserPage({ author, knownNotes = [], onBack, onOpenNote }
                         onError={() => setAvatarBroken(true)}
                       />
                     )}
-                  </div>
-
-                  <div className="user-action-buttons">
-                    <button
-                      type="button"
-                      className={`btn-user-follow ${following ? 'following' : ''}`}
-                      onClick={() => {
-                        setFollowing(!following)
-                        Toast.show({
-                          content: !following ? '已关注博主' : '已取消关注',
-                          duration: 1.2,
-                        })
-                      }}
-                    >
-                      {following ? '已关注' : '+ 关注'}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-user-msg"
-                      onClick={() => Toast.show({ content: '私信通道已就绪', duration: 1.2 })}
-                    >
-                      发消息
-                    </button>
                   </div>
                 </div>
 
