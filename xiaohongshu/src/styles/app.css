@@ -1663,7 +1663,7 @@
 .user-page-container {
   position: absolute;
   inset: 0;
-  z-index: 50;
+  z-index: 60;
   background: #ffffff;
   display: flex;
   flex-direction: column;

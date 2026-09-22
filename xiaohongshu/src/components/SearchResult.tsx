@@ -295,6 +295,7 @@ export default function SearchResult({
     setIsClosing(true)
     setTimeout(() => {
       onBack()
+      setIsClosing(false)
     }, 220)
   }
 
@@ -303,6 +304,7 @@ export default function SearchResult({
     setIsClosing(true)
     setTimeout(() => {
       onGoHome()
+      setIsClosing(false)
     }, 200)
   }
 
@@ -637,20 +639,15 @@ export default function SearchResult({
                   src={n.author.avatar || 'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'}
                   alt={n.author.name}
                   className="search-user-avatar"
+                  onError={(e) => {
+                    ;(e.currentTarget as HTMLImageElement).src =
+                      'https://sns-avatar-qc.xhscdn.com/avatar/6054fe950000000005774a42.jpg'
+                  }}
                 />
                 <div className="search-user-info">
                   <div className="search-user-name">{n.author.name}</div>
                   <div className="search-user-sub">小红书号：{n.author.userId?.slice(0, 8) || 'red_creator'} · 笔记 {Math.floor(10 + Math.random() * 40)}</div>
                 </div>
-                <button
-                  type="button"
-                  className="search-user-follow"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                  }}
-                >
-                  关注
-                </button>
               </div>
             ))}
           </div>

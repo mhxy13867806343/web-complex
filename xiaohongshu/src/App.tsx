@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import Explore from './components/Explore'
 import UserPage from './components/UserPage'
 import NoteDetail from './components/NoteDetail'
@@ -14,6 +15,20 @@ import { useRoute, navigate, openNoteRoute, openUserProfileRoute, getExploreUrl 
  */
 export default function App() {
   const route = useRoute()
+  const [searchMounted, setSearchMounted] = useState(false)
+  const [searchKeyword, setSearchKeyword] = useState('vlog')
+
+  useEffect(() => {
+    if (route.name === 'search') {
+      setSearchMounted(true)
+      if (route.keyword) {
+        setSearchKeyword(route.keyword)
+      }
+    } else if (route.name === 'home') {
+      // 彻底返回首页时卸载搜索结果页
+      setSearchMounted(false)
+    }
+  }, [route.name, route.keyword])
 
   return (
     <div className="phone">
@@ -31,6 +46,37 @@ export default function App() {
       >
         <Explore />
       </div>
+
+      {/* 搜索结果页同样保持常驻缓存：从搜索页进入博主主页或笔记详情时保持挂载，返回后分类Tab（如用户Tab）、子标签、已加载笔记和滚动位置完好如初 */}
+      {searchMounted && (
+        <div
+          style={{
+            display: 'block',
+            visibility: route.name === 'search' ? 'visible' : 'hidden',
+            pointerEvents: route.name === 'search' ? 'auto' : 'none',
+          }}
+        >
+          <SearchResult
+            keyword={searchKeyword}
+            onBack={() => {
+              if (window.history.length > 1) {
+                window.history.back()
+              } else {
+                navigate(getExploreUrl())
+              }
+            }}
+            onGoHome={() => {
+              navigate(getExploreUrl())
+            }}
+            onOpenNote={(note) => {
+              openNoteRoute(note.id)
+            }}
+            onOpenUser={(author) => {
+              openUserProfileRoute(author)
+            }}
+          />
+        </div>
+      )}
 
       {route.name === 'user' && (
         <UserPage
@@ -65,29 +111,6 @@ export default function App() {
           }}
           onGoHome={() => {
             navigate(getExploreUrl())
-          }}
-          onOpenUser={(author) => {
-            openUserProfileRoute(author)
-          }}
-        />
-      )}
-
-      {route.name === 'search' && (
-        <SearchResult
-          key={route.keyword}
-          keyword={route.keyword || 'vlog'}
-          onBack={() => {
-            if (window.history.length > 1) {
-              window.history.back()
-            } else {
-              navigate(getExploreUrl())
-            }
-          }}
-          onGoHome={() => {
-            navigate(getExploreUrl())
-          }}
-          onOpenNote={(note) => {
-            openNoteRoute(note.id)
           }}
           onOpenUser={(author) => {
             openUserProfileRoute(author)

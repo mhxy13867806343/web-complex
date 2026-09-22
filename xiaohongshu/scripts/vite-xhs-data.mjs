@@ -851,7 +851,7 @@ export async function searchNotesApi({
       likes: 48,
       author: {
         name: '爱吃西瓜心',
-        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/54eefc3c0000000005600160.jpg',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/64317c2ac2358b601fc78edd.jpg',
         userId: '54eefc3c0000000005600160',
         userUrl: 'https://www.xiaohongshu.com/user/profile/54eefc3c0000000005600160',
       },
@@ -869,7 +869,7 @@ export async function searchNotesApi({
       likes: 210,
       author: {
         name: '锦鲤影视',
-        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5a4d3f3a000000000b8c6995.jpg',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/619e07bd33c29472034c3dd7.jpg',
         userId: '5a4d3f3a000000000b8c6995',
         userUrl: 'https://www.xiaohongshu.com/user/profile/5a4d3f3a000000000b8c6995',
       },
@@ -887,7 +887,7 @@ export async function searchNotesApi({
       likes: 70,
       author: {
         name: '红薯影视',
-        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/502436640000000004908972.jpg',
+        avatar: 'https://sns-avatar-qc.xhscdn.com/avatar/5d69dbca00000000010081fc.jpg',
         userId: '502436640000000004908972',
         userUrl: 'https://www.xiaohongshu.com/user/profile/502436640000000004908972',
       },
