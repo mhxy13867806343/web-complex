@@ -4,12 +4,14 @@ import type { Note } from '../data'
 import { fetchChannels, fetchFeed } from '../data/api'
 import { STATIC_CHANNELS } from '../data/staticFeeds'
 import { PTR_TRIGGER, usePullToRefresh } from '../hooks/usePullToRefresh'
-import { openUserProfileRoute, openNoteRoute, setExploreChannel } from '../router'
+import { openUserProfileRoute, openNoteRoute, setExploreChannel, openSearchResultRoute } from '../router'
 import ChannelChips from './ChannelChips'
 import { Toast } from './Toast'
 import Waterfall from './Waterfall'
 
 const RECOMMEND = '推荐'
+/** 热门搜索推荐词汇 */
+const HOT_SEARCHES = ['🔥 范丞丞', '穿搭', '美食', '日常vlog', '秋季穿搭', '减脂餐', '摄影神图', '护肤']
 /** 给 document.querySelector 用（带 #），下拉刷新 / 切频道滚顶都靠它 */
 const SCROLLER = '#page-body'
 /** 给 NutUI InfiniteLoading 的 target 用 —— 组件内部是 document.getElementById(target)，所以这里只能传 id（不带 #） */
@@ -87,6 +89,34 @@ export default function Explore() {
 
   const list: Note[] = feeds[channel] || []
   const hasMore = !dead[channel] && !bottom[channel]
+
+  /** 顶部搜索状态 */
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [showSuggest, setShowSuggest] = useState(false)
+  const searchWrapRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const handleDocClick = (e: MouseEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setShowSuggest(false)
+      }
+    }
+    document.addEventListener('mousedown', handleDocClick)
+    return () => document.removeEventListener('mousedown', handleDocClick)
+  }, [])
+
+  const handleSearch = (kw?: string) => {
+    const q = (typeof kw === 'string' ? kw : searchKeyword).trim() || '范丞丞'
+    setShowSuggest(false)
+    openSearchResultRoute(q)
+  }
+
+  const handleTagClick = (tag: string) => {
+    const cleanTag = tag.replace(/^🔥\s*/, '').trim()
+    setSearchKeyword(cleanTag)
+    setShowSuggest(false)
+    openSearchResultRoute(cleanTag)
+  }
 
   /** 记录每个频道的滚动条高度，切回或返回时精准复原 */
   const channelScrollRef = useRef<Record<string, number>>({})
@@ -337,7 +367,86 @@ export default function Explore() {
     <div>
       {/* 顶栏 + 频道栏整体吸顶，滚多远都能直接切频道 */}
       <div className="sticky-top">
-    
+        {/* 顶部搜索栏 */}
+        <header className="explore-header" ref={searchWrapRef}>
+          <div
+            className="explore-logo"
+            onClick={() => {
+              document.querySelector(SCROLLER)?.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            title="回到顶部"
+          >
+            小红书
+          </div>
+
+          <div className="explore-search-wrap">
+            <span className="explore-search-icon">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input
+              type="text"
+              className="explore-search-input"
+              value={searchKeyword}
+              placeholder="搜索小红书笔记（如：范丞丞）"
+              onFocus={() => setShowSuggest(true)}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch()
+                }
+              }}
+            />
+            {searchKeyword && (
+              <button
+                type="button"
+                className="explore-search-clear"
+                onClick={() => setSearchKeyword('')}
+                title="清空"
+                aria-label="清空输入"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              type="button"
+              className="explore-search-btn"
+              onClick={() => handleSearch()}
+              title="搜索"
+            >
+              搜索
+            </button>
+          </div>
+
+          {showSuggest && (
+            <div className="explore-search-suggestions">
+              <div className="explore-suggest-title">热门搜索</div>
+              <div className="explore-suggest-tags">
+                {HOT_SEARCHES.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`explore-suggest-tag ${tag.includes('🔥') ? 'hot' : ''}`}
+                    onClick={() => handleTagClick(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </header>
 
         {/* 下拉刷新提示区：随手指位移撑开高度，把内容顶下去 */}
         <div

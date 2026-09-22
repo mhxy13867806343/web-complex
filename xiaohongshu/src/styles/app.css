@@ -14,47 +14,177 @@
   background: #fff;
 }
 
-.xhs-header {
+/* ---------------- 首页探索页顶栏搜索 ---------------- */
+.explore-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px 8px;
-  background: #fff;
+  gap: 10px;
+  padding: 10px 14px 6px;
+  background: #ffffff;
+  position: relative;
+  z-index: 40;
 }
 
-.xhs-logo {
+.explore-logo {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--xhs-red);
+  letter-spacing: -0.6px;
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.explore-logo:active {
+  opacity: 0.75;
+}
+
+.explore-search-wrap {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  background: #f4f5f7;
+  border-radius: 18px;
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--xhs-red);
-  letter-spacing: -0.5px;
+  padding: 0 6px 0 12px;
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.explore-search-wrap:focus-within {
+  background: #ffffff;
+  border-color: rgba(255, 36, 66, 0.45);
+  box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.08);
+}
+
+.explore-search-icon {
+  flex-shrink: 0;
+  color: #999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.explore-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #222222;
+}
+
+.explore-search-input::placeholder {
+  color: #999999;
+}
+
+.explore-search-clear {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: #dedede;
+  color: #666666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.explore-search-clear:hover {
+  background: #cccccc;
+}
+
+.explore-search-btn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: none;
+  background: var(--xhs-red);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
   white-space: nowrap;
 }
 
-.xhs-search {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
+.explore-search-btn:active {
+  background: var(--xhs-red-dark);
+  transform: scale(0.96);
 }
 
-.xhs-search .nut-searchbar {
-  padding: 0;
-  background: transparent;
+/* 热门搜索下拉建议气泡 */
+.explore-search-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 14px;
+  right: 14px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 14px 14px;
+  z-index: 60;
+  animation: searchFadeIn 0.18s ease-out;
 }
 
-.xhs-search .nut-searchbar__search-input {
-  height: 32px;
-  background: #f5f5f5;
-  border-radius: 16px;
-  font-size: 13px;
+.explore-suggest-title {
+  font-size: 12px;
+  color: #999999;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 
-.xhs-header-icon {
-  flex-shrink: 0;
-  color: #333;
+.explore-suggest-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
+
+.explore-suggest-tag {
+  padding: 5px 12px;
+  background: #f5f6f8;
+  border-radius: 14px;
+  font-size: 12px;
+  color: #333333;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.explore-suggest-tag:hover {
+  background: #ebeef2;
+  color: var(--xhs-red);
+}
+
+.explore-suggest-tag.hot {
+  color: var(--xhs-red);
+  background: #fff0f2;
+  font-weight: 500;
+}
+
+@keyframes searchFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 
 /* 刷新按钮：点一下现抓一次小红书 */
 .xhs-refresh {
